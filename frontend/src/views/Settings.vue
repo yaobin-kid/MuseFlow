@@ -129,8 +129,11 @@
             <el-divider />
             <el-form-item label="上游音源搜索顺序">
               <el-select v-model="config.upstream.source_order" multiple filterable allow-create default-first-option style="width: 100%">
-                <el-option v-for="s in ['netease', 'tencent', 'kugou', 'kuwo', 'migu', 'joox', 'spotify', 'apple']" :key="s" :label="s" :value="s" />
+                <el-option v-for="s in UPSTREAM_SOURCES" :key="s.value" :label="s.label" :value="s.value" />
               </el-select>
+              <div class="dim" style="font-size:11.5px; margin-top: 6px">
+                上游仅支持 netease、netease2、bilibili、joox、kuwo，按从左到右的顺序依次尝试
+              </div>
             </el-form-item>
           </el-form>
         </div>
@@ -334,6 +337,14 @@ import api from '../api'
 import PlatformBadge from '../components/PlatformBadge.vue'
 import { realtime } from '../stores/realtime'
 import { PLATFORM_META, fmtTime } from '../utils/constants'
+
+const UPSTREAM_SOURCES = [
+  { value: 'netease', label: 'netease（网易云 1）' },
+  { value: 'netease2', label: 'netease2（网易云 2）' },
+  { value: 'bilibili', label: 'bilibili（B 站）' },
+  { value: 'joox', label: 'joox（JOOX）' },
+  { value: 'kuwo', label: 'kuwo（酷我）' }
+]
 
 const config = ref(null)
 const system = ref({})

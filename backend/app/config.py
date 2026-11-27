@@ -9,6 +9,11 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# 上游搜索/下载 API 支持的 source 取值（见 上游服务.MD）
+SUPPORTED_UPSTREAM_SOURCES: List[str] = ["netease", "netease2", "bilibili", "joox", "kuwo"]
+DEFAULT_UPSTREAM_SOURCE_ORDER = "netease,netease2,kuwo,joox,bilibili"
+
+
 class Settings(BaseSettings):
     """基础设施配置，全部可通过环境变量覆盖。"""
 
@@ -73,7 +78,7 @@ class Settings(BaseSettings):
     upstream_timeout_sec: int = 60
     upstream_bitrate: str = "999"
     upstream_file_path_template: str = "/music/{filename}"
-    upstream_source_order: str = "netease,tencent,kugou,kuwo,migu,joox,spotify,apple"
+    upstream_source_order: str = DEFAULT_UPSTREAM_SOURCE_ORDER
     upstream_cover_path: str = "/api/pic"
     upstream_lyric_path: str = "/api/lyric"
     upstream_local_download_dir: str = ""
@@ -182,7 +187,7 @@ class UpstreamConfig(BaseModel):
     cover_path: str = "/api/pic"
     lyric_path: str = "/api/lyric"
     local_download_dir: str = ""
-    source_order: List[str] = Field(default_factory=lambda: ["netease", "tencent", "kugou", "kuwo", "migu"])
+    source_order: List[str] = Field(default_factory=lambda: list(SUPPORTED_UPSTREAM_SOURCES))
 
 
 class RuntimeConfig(BaseModel):

@@ -254,6 +254,14 @@ def _migrate_legacy_defaults(cfg: RuntimeConfig) -> bool:
         if current == legacy_music and default != legacy_music:
             setattr(cfg.paths, key, getattr(settings, key))
             changed = True
+
+    # 旧版默认音源包含上游已不支持的值（tencent/kugou/migu/spotify/apple）
+    legacy_sources = {"netease", "tencent", "kugou", "kuwo", "migu", "joox", "spotify", "apple"}
+    if set(cfg.upstream.source_order) == legacy_sources:
+        cfg.upstream.source_order = [
+            item.strip() for item in settings.upstream_source_order.split(",") if item.strip()
+        ]
+        changed = True
     return changed
 
 

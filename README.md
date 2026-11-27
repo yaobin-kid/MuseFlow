@@ -237,7 +237,7 @@ UPSTREAM_PORT=8080
 UPSTREAM_BASE_URL=http://127.0.0.1:8080
 UPSTREAM_LOCAL_DOWNLOAD_DIR=/music
 UPSTREAM_BITRATE=999
-UPSTREAM_SOURCE_ORDER=netease,tencent,kugou,kuwo,migu,joox,spotify,apple
+UPSTREAM_SOURCE_ORDER=netease,netease2,kuwo,joox,bilibili
 UPSTREAM_COVER_PATH=/api/pic
 UPSTREAM_LYRIC_PATH=/api/lyric
 
@@ -305,7 +305,7 @@ COLLECT_INTERVAL_MINUTES=360
 | `UPSTREAM_BASE_URL` | `http://127.0.0.1:8080`（镜像内） | 上游搜索/下载服务地址，指向外部上游时改为其地址 |
 | `UPSTREAM_TIMEOUT_SEC` | `60` | 上游请求超时（秒） |
 | `UPSTREAM_BITRATE` | `999` | 期望码率（`999` 表示尽量取最高/Hi-Res） |
-| `UPSTREAM_SOURCE_ORDER` | `netease,tencent,kugou,kuwo,migu,joox,spotify,apple` | 上游音源优先级 |
+| `UPSTREAM_SOURCE_ORDER` | `netease,netease2,kuwo,joox,bilibili` | 上游音源优先级（仅支持 `netease`、`netease2`、`bilibili`、`joox`、`kuwo`） |
 | `UPSTREAM_FILE_PATH_TEMPLATE` | `/music/{filename}` | 外部上游返回 JSON 文件名时，按此模板拼接音频地址 |
 | `UPSTREAM_LOCAL_DOWNLOAD_DIR` | `/music`（镜像内） | 内置上游下载目录（只读），MuseFlow 从这里复制文件；留空则走 HTTP 下载 |
 | `UPSTREAM_COVER_PATH` | `/api/pic` | 上游「歌曲封面图片数据」接口路径（参数 `source`、`id`） |
@@ -480,7 +480,7 @@ backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 只包含已完成下载并已被 Navidrome 索引的曲目。若刚下载完成，请等待刷新延迟或点「刷新歌单」。
 
 **Q：下载失败提示「上游未找到匹配音源」？**
-上游音源覆盖有限，可调整 `UPSTREAM_SOURCE_ORDER`，或在「手动搜索」中用正确歌名/歌手重试。
+上游 `source` 仅支持 `netease`、`netease2`、`bilibili`、`joox`、`kuwo`，可在 `UPSTREAM_SOURCE_ORDER` 调整尝试顺序，或在「手动搜索」中用正确歌名/歌手重试。
 
 **Q：修改了 `.env` 但没生效？**
 控制台「系统设置」中的数据库配置优先级更高，「恢复环境变量默认值」后重启，或重新部署。

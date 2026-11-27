@@ -78,10 +78,9 @@ class DownloadWorker:
             item = task.get("upstream_meta") or {}
             if not item.get("id"):
                 await limiter.acquire()
-                results = await upstream.search_multi(f"{task['artist']} {task['title']}".strip())
-                best = upstream.pick_best_match(results, task["title"], task["artist"])
+                best = await upstream.search_best(task["title"], task["artist"])
                 if not best:
-                    raise RuntimeError("上游未找到匹配音源")
+                    raise RuntimeError("所有音源均未找到匹配音源")
                 item = best
                 await update_task(
                     task_id,
@@ -89,7 +88,7 @@ class DownloadWorker:
                     source_id=str(item.get("id") or ""),
                     upstream_meta=item,
                     progress=25,
-                    message=f"已匹配音源 {item.get('source')}",
+                    message=f"已匹配音源 {item.get('_searched_source') or item.get('source') or ''}",
                 )
                 await push_task(await get_task(task_id))
 

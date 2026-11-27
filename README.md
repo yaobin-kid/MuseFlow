@@ -448,6 +448,8 @@ COLLECT_INTERVAL_MINUTES=360
 
 MuseFlow 内置 `/api/cover` 代理封面接口，供浏览器 `<img>` 直接引用；上游不可用时前端自动回退为渐变首字封面。
 
+自动下载的检索规则：`name` 参数只使用**歌曲名**（不含歌手），按 `UPSTREAM_SOURCE_ORDER` 从第一个音源开始逐个尝试；前一个音源没有匹配结果才尝试下一个（单个音源报错也会跳过），所有音源都失败才标记任务失败。
+
 ---
 
 ## 数据与目录结构
@@ -479,8 +481,8 @@ backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 **Q：Navidrome 歌单里歌曲不全？**
 只包含已完成下载并已被 Navidrome 索引的曲目。若刚下载完成，请等待刷新延迟或点「刷新歌单」。
 
-**Q：下载失败提示「上游未找到匹配音源」？**
-上游 `source` 仅支持 `netease`、`netease2`、`bilibili`、`joox`、`kuwo`，可在 `UPSTREAM_SOURCE_ORDER` 调整尝试顺序，或在「手动搜索」中用正确歌名/歌手重试。
+**Q：下载失败提示「所有音源均未找到匹配音源」？**
+表示已按 `UPSTREAM_SOURCE_ORDER` 把所有音源都试过且没有匹配结果。上游 `source` 仅支持 `netease`、`netease2`、`bilibili`、`joox`、`kuwo`，可调整尝试顺序，或在「手动搜索」中用正确歌名/歌手重试。
 
 **Q：修改了 `.env` 但没生效？**
 控制台「系统设置」中的数据库配置优先级更高，「恢复环境变量默认值」后重启，或重新部署。

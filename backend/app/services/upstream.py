@@ -57,6 +57,30 @@ class UpstreamService:
             await hub.log("WARN", "upstream", "部分音源搜索失败: " + "; ".join(errors[:3]))
         return results
 
+    async def search_best(self, title: str, artist: str = "") -> Optional[dict]:
+        """按配置的音源顺序逐个尝试，返回第一个匹配到的结果；全部失败返回 None。"""
+        query = (title or "").strip()
+        if not query:
+            return None
+        errors: list[str] = []
+        for source in self.cfg.source_order:
+            try:
+                items = await self.search(source, query)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"{source}: {exc}")
+                continue
+            for item in items:
+                item["_searched_source"] = source
+            best = self.pick_best_match(items, title, artist)
+            if best:
+                return best
+            await hub.log(
+                "INFO", "upstream", f"音源 {source} 未匹配到《{title}》，尝试下一个音源"
+            )
+        if errors:
+            await hub.log("WARN", "upstream", "音源搜索失败: " + "; ".join(errors[:3]))
+        return None
+
     # ---------------------------------------------------------------- 下载
     async def download(self, item: dict, temp_dir: str) -> tuple[dict, Optional[str]]:
         payload = {

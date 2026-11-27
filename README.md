@@ -77,6 +77,22 @@ docker compose down             # 停止并移除容器
 docker compose up -d --build    # 修改代码或配置后重新构建
 ```
 
+> **使用预构建镜像**：仓库已配置 GitHub Actions，每次推送到 `main` 会自动构建并推送 amd64 / arm64 多架构镜像：
+>
+> ```bash
+> docker pull ghcr.io/yaobin-kid/museflow:latest
+> ```
+>
+> 将 `docker-compose.yml` 中的 `build:` 段替换为 `image: ghcr.io/yaobin-kid/museflow:latest`，再执行 `docker compose up -d` 即可（无需本地构建环境）。
+
+仅构建镜像不启动：
+
+```bash
+docker build -t museflow:latest .
+# 或
+docker compose build
+```
+
 ### 方式二：本地开发运行
 
 环境要求：Python 3.11+、Node.js 18+。

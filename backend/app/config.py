@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    app_name: str = "MuseFlow"
+    app_name: str = "MusicFlow"
     host: str = "0.0.0.0"
     port: int = 8000
     data_dir: str = "./data"
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     navidrome_match_mode: str = "strict"
     navidrome_auto_scan: bool = True
     navidrome_sync_playlists: bool = True
-    navidrome_playlist_prefix: str = "MuseFlow"
+    navidrome_playlist_prefix: str = "MusicFlow"
     navidrome_playlist_refresh_delay_sec: int = 30
 
     temp_download_dir: str = "./data/downloads/temp"
@@ -157,7 +157,7 @@ class NavidromeConfig(BaseModel):
     match_mode: str = "strict"
     auto_scan_after_move: bool = True
     sync_playlists: bool = True
-    playlist_prefix: str = "MuseFlow"
+    playlist_prefix: str = "MusicFlow"
     playlist_refresh_delay_sec: int = 30
 
 

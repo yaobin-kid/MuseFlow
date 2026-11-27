@@ -100,6 +100,17 @@
           <el-table-column label="信息" min-width="180">
             <template #default="{ row }"><span class="dim" style="font-size:11px">{{ row.message || '—' }}</span></template>
           </el-table-column>
+          <el-table-column label="操作" width="90" align="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="!['DOWNLOADING', 'PROCESSING'].includes(row.status)"
+                size="small"
+                text
+                type="danger"
+                @click="removeManual(row)"
+              >删除</el-button>
+            </template>
+          </el-table-column>
           <template #empty><span class="dim" style="font-size:12px">暂无手动下载任务</span></template>
         </el-table>
       </div>
@@ -109,7 +120,7 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import api from '../api'
 import StatusTag from '../components/StatusTag.vue'
@@ -179,6 +190,25 @@ async function download(row) {
     } else {
       ElMessage.error(detail)
     }
+  }
+}
+
+async function removeManual(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除任务 #${row.id} 的记录？`, '删除记录', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  try {
+    await api.delete(`/tasks/${row.id}`)
+    ElMessage.success('记录已删除')
+    loadManualTasks()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '删除失败')
   }
 }
 

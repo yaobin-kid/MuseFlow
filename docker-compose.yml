@@ -18,7 +18,7 @@ services:
       TZ: Asia/Shanghai
       DATA_DIR: /data
       TEMP_DOWNLOAD_DIR: /data/downloads/temp
-      # MuseFlow 最终音乐库（不要让 Navidrome 扫描 /music）
+      # MusicFlow 最终音乐库（不要让 Navidrome 扫描 /music）
       FINAL_MUSIC_DIR: /library
       # 内置上游服务，仅供容器内部访问
       RUN_UPSTREAM: "true"
@@ -26,7 +26,7 @@ services:
     volumes:
       # 数据库、日志、临时文件
       - ./data:/data
-      # 上游服务的下载目录（固定为 /music）：MuseFlow 只读读取，不写入
+      # 上游服务的下载目录（固定为 /music）：MusicFlow 只读读取，不写入
       - ./music:/music
-      # MuseFlow 整理后的音乐库，供 Navidrome 扫描
+      # MusicFlow 整理后的音乐库，供 Navidrome 扫描
       - ./library:/library

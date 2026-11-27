@@ -80,7 +80,7 @@
           <el-table-column label="更新时间" width="120">
             <template #default="{ row }"><span class="dim">{{ fmtTime(row.updated_at) }}</span></template>
           </el-table-column>
-          <el-table-column label="操作" width="140" align="right">
+          <el-table-column label="操作" width="180" align="right">
             <template #default="{ row }">
               <el-button
                 v-if="['FAILED', 'CANCELLED', 'COMPLETED'].includes(row.status)"
@@ -95,6 +95,13 @@
                 type="danger"
                 @click="cancel(row)"
               >取消</el-button>
+              <el-button
+                v-if="!['DOWNLOADING', 'PROCESSING'].includes(row.status)"
+                size="small"
+                text
+                type="danger"
+                @click="remove(row)"
+              >删除</el-button>
             </template>
           </el-table-column>
           <template #empty><span class="dim" style="font-size:12px">暂无任务</span></template>
@@ -106,7 +113,7 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api'
 import StatusTag from '../components/StatusTag.vue'
 import TrackCover from '../components/TrackCover.vue'
@@ -145,6 +152,25 @@ async function load() {
 function switchFilter(value) {
   filter.value = value
   load()
+}
+
+async function remove(row) {
+  try {
+    await ElMessageBox.confirm(`确定删除任务 #${row.id} 的记录？`, '删除记录', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  try {
+    await api.delete(`/tasks/${row.id}`)
+    ElMessage.success(`任务 #${row.id} 记录已删除`)
+    load()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '删除失败')
+  }
 }
 
 async function retry(row) {

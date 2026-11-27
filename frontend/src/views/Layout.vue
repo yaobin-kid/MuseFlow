@@ -10,7 +10,7 @@
           </svg>
         </div>
         <div class="brand-text">
-          <div class="brand-name">MuseFlow</div>
+          <div class="brand-name">MusicFlow</div>
           <div class="brand-sub">Music Automation</div>
         </div>
       </div>
@@ -83,7 +83,7 @@ import { disconnectRealtime } from '../utils/realtime'
 const route = useRoute()
 const router = useRouter()
 const username = ref(localStorage.getItem('mf_user') || 'admin')
-const system = ref({ app_name: 'MuseFlow', version: '1.0.0', demo_mode: false })
+const system = ref({ app_name: 'MusicFlow', version: '1.0.0', demo_mode: false })
 
 const navItems = [
   { path: '/dashboard', label: '数据看板', icon: 'DataLine' },

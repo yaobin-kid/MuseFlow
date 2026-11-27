@@ -133,7 +133,7 @@ async def test_proxy(payload: ProxyTestPayload | None = None) -> dict:
             proxy=proxy,
             timeout=httpx.Timeout(20.0, connect=15.0),
             follow_redirects=True,
-            headers={"User-Agent": "MuseFlow/1.0"},
+            headers={"User-Agent": "MusicFlow/1.0"},
         ) as client:
             resp = await client.get(target)
         elapsed = int((time.perf_counter() - started) * 1000)

@@ -255,6 +255,11 @@ def _migrate_legacy_defaults(cfg: RuntimeConfig) -> bool:
             setattr(cfg.paths, key, getattr(settings, key))
             changed = True
 
+    # 旧版品牌默认歌单前缀迁移
+    if cfg.navidrome.playlist_prefix == "MuseFlow":
+        cfg.navidrome.playlist_prefix = settings.navidrome_playlist_prefix
+        changed = True
+
     # 旧版默认音源包含上游已不支持的值（tencent/kugou/migu/spotify/apple）
     legacy_sources = {"netease", "tencent", "kugou", "kuwo", "migu", "joox", "spotify", "apple"}
     if set(cfg.upstream.source_order) == legacy_sources:

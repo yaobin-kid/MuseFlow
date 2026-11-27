@@ -258,6 +258,35 @@ async def list_tasks(status: str = "", limit: int = 100, mode: str = "") -> list
     return rows
 
 
+async def delete_task(task_id: int) -> None:
+    await execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+
+
+async def recover_interrupted_tasks() -> int:
+    """服务重启后，把内存队列中已丢失的任务标记为失败，避免一直停留在下载中。"""
+    row = await fetchone(
+        "SELECT COUNT(*) AS cnt FROM tasks "
+        "WHERE status IN ('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING')"
+    )
+    count = row["cnt"] if row else 0
+    if not count:
+        return 0
+    ts = now_iso()
+    await execute(
+        "UPDATE tracks SET status = 'FAILED' WHERE id IN ("
+        "SELECT track_id FROM tasks WHERE track_id IS NOT NULL "
+        "AND status IN ('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING')) "
+        "AND status != 'COMPLETED'"
+    )
+    await execute(
+        "UPDATE tasks SET status = 'FAILED', message = '服务重启，任务已中断', "
+        "finished_at = ?, updated_at = ? "
+        "WHERE status IN ('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING')",
+        (ts, ts),
+    )
+    return count
+
+
 async def task_counts() -> dict[str, int]:
     rows = await fetchall("SELECT status, COUNT(*) AS cnt FROM tasks GROUP BY status")
     return {row["status"]: row["cnt"] for row in rows}

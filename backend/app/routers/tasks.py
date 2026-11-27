@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..events import hub, push_task
-from ..repo import get_task, list_tasks, set_track_status, task_counts, update_task
+from ..repo import delete_task, get_task, list_tasks, set_track_status, task_counts, update_task
 from ..security import get_current_user
 from ..services.queue import worker
 from ..services.rate_limiter import limiter
@@ -57,5 +57,8 @@ async def remove(task_id: int) -> dict:
     task = await get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
-    await update_task(task_id, status="CANCELLED", message="已删除")
+    if task["status"] in ("DOWNLOADING", "PROCESSING"):
+        raise HTTPException(status_code=400, detail="任务正在执行中，无法删除")
+    await delete_task(task_id)
+    await hub.log("INFO", "tasks", f"任务 #{task_id} 记录已删除")
     return {"ok": True}

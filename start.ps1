@@ -39,6 +39,6 @@ if (-not (Test-Path $staticIndex)) {
     Pop-Location
 }
 
-Write-Host "启动 MuseFlow: http://127.0.0.1:$Port" -ForegroundColor Green
+Write-Host "启动 MusicFlow: http://127.0.0.1:$Port" -ForegroundColor Green
 Set-Location (Join-Path $root "backend")
 & $venvPython -m uvicorn app.main:app --host 0.0.0.0 --port $Port

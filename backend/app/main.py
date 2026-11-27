@@ -1,4 +1,4 @@
-"""MuseFlow 应用入口。"""
+"""MusicFlow 应用入口。"""
 from __future__ import annotations
 
 import hashlib
@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from .config import ensure_dirs, settings
 from .db import close_db, get_runtime_config, init_db, load_runtime_config
 from .events import hub
-from .repo import ensure_playlists
+from .repo import ensure_playlists, recover_interrupted_tasks
 from .routers import auth, dashboard, manual, scoring, settings as settings_router, sources, tasks, ws
 from .scheduler import apply_schedule, start_scheduler, stop_scheduler
 from .services.navidrome import navidrome
@@ -36,6 +36,9 @@ async def lifespan(app: FastAPI):
     apply_rate_limit_config(cfg.rate_limit.window_sec, cfg.rate_limit.max_requests)
     await ensure_playlists()
     await navidrome.load_cache()
+    interrupted = await recover_interrupted_tasks()
+    if interrupted:
+        await hub.log("WARN", "system", f"已将 {interrupted} 个重启前中断的任务标记为失败")
     await seed_demo_data(cfg)
     worker.start()
     start_scheduler()
@@ -54,7 +57,7 @@ async def lifespan(app: FastAPI):
     await close_db()
 
 
-app = FastAPI(title="MuseFlow 音乐聚合控制台", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="MusicFlow 音乐聚合控制台", version="1.0.0", lifespan=lifespan)
 
 origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
@@ -123,7 +126,7 @@ async def cover_proxy(source: str, id: str) -> Response:
             base_url=cfg.upstream.base_url.rstrip("/"),
             timeout=15,
             follow_redirects=True,
-            headers={"User-Agent": "MuseFlow/1.0"},
+            headers={"User-Agent": "MusicFlow/1.0"},
         ) as client:
             resp = await client.get(cfg.upstream.cover_path, params={"source": source, "id": id})
             content_type = resp.headers.get("content-type", "")

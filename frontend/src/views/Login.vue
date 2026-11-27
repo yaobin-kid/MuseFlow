@@ -11,7 +11,7 @@
           </svg>
         </div>
         <div>
-          <div class="brand-name" style="font-size:19px">MuseFlow</div>
+          <div class="brand-name" style="font-size:19px">MusicFlow</div>
           <div class="brand-sub">Music Automation Platform</div>
         </div>
       </div>

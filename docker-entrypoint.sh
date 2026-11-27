@@ -1,6 +1,6 @@
 #!/bin/sh
-# MuseFlow 容器入口：同一容器内同时运行内置上游服务与 MuseFlow 控制台
-# /music 固定为上游服务的下载目录（MuseFlow 仅只读读取）；MuseFlow 音乐库在 /library
+# MusicFlow 容器入口：同一容器内同时运行内置上游服务与 MusicFlow 控制台
+# /music 固定为上游服务的下载目录（MusicFlow 仅只读读取）；MusicFlow 音乐库在 /library
 set -eu
 
 UPSTREAM_PORT="${UPSTREAM_PORT:-8080}"

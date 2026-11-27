@@ -1,6 +1,6 @@
-# MuseFlow · 全自动热门歌单聚合与音乐库管理系统
+# MusicFlow · 全自动热门歌单聚合与音乐库管理系统
 
-MuseFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ 音乐、Spotify、Apple Music 采集榜单 → 跨平台交叉打分 → 高分准入 → Navidrome 去重 → 限流保护下的上游检索下载 → 标签/封面/歌词整理归档 → 自动扫库 → **自动在 Navidrome 生成并持续刷新歌单**。
+MusicFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ 音乐、Spotify、Apple Music 采集榜单 → 跨平台交叉打分 → 高分准入 → Navidrome 去重 → 限流保护下的上游检索下载 → 标签/封面/歌词整理归档 → 自动扫库 → **自动在 Navidrome 生成并持续刷新歌单**。
 
 一个容器即可跑起来，前端构建产物由 FastAPI 直接托管。
 
@@ -34,7 +34,7 @@ MuseFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ
 | -- | -------------------------------------------------------- |
 | 后端 | Python 3.11+ · FastAPI · APScheduler · SQLite（aiosqlite） |
 | 前端 | Vue 3 · Vite · Element Plus · ECharts                    |
-| 部署 | 单容器：MuseFlow + 内置上游服务，前端构建产物由 FastAPI 托管在 `/`            |
+| 部署 | 单容器：MusicFlow + 内置上游服务，前端构建产物由 FastAPI 托管在 `/`            |
 
 ```text
 ┌────────────────────────────┐
@@ -152,9 +152,9 @@ services:
     volumes:
       # 数据库、日志、临时文件
       - ./data:/data
-      # 上游服务固定下载目录：MuseFlow 只读读取，不写入
+      # 上游服务固定下载目录：MusicFlow 只读读取，不写入
       - ./music:/music
-      # MuseFlow 整理后的音乐库，供 Navidrome 扫描
+      # MusicFlow 整理后的音乐库，供 Navidrome 扫描
       - ./library:/library
 ```
 
@@ -162,9 +162,9 @@ services:
 
 | 容器路径       | 宿主机路径       | 归属       | 说明                              |
 | ---------- | ----------- | -------- | ------------------------------- |
-| `/music`   | `./music`   | 上游服务专用   | 上游固定下载目录，MuseFlow **只读**读取，绝不写入 |
-| `/library` | `./library` | MuseFlow | 最终音乐库（按歌手/专辑归档），Navidrome 只扫描这里 |
-| `/data`    | `./data`    | MuseFlow | SQLite 数据库、日志、整理暂存文件            |
+| `/music`   | `./music`   | 上游服务专用   | 上游固定下载目录，MusicFlow **只读**读取，绝不写入 |
+| `/library` | `./library` | MusicFlow | 最终音乐库（按歌手/专辑归档），Navidrome 只扫描这里 |
+| `/data`    | `./data`    | MusicFlow | SQLite 数据库、日志、整理暂存文件            |
 
 | 配置项                                         | 说明                                                  |
 | ------------------------------------------- | --------------------------------------------------- |
@@ -175,7 +175,7 @@ services:
 | `./music:/music`                            | 改为 NAS 实际路径，例如 `/volume1/upstream-music:/music`     |
 | `./library:/library`                        | 改为 NAS 实际路径，例如 `/volume1/museflow-library:/library` |
 
-### 完整版：MuseFlow + Navidrome 一起部署
+### 完整版：MusicFlow + Navidrome 一起部署
 
 同一台 NAS 上直接使用下面的完整文件即可（Navidrome 只挂载 `/library` 只读扫描）：
 
@@ -269,9 +269,9 @@ SCHEDULER_ENABLED=true
 COLLECT_INTERVAL_MINUTES=360
 ```
 
-> **内置上游说明**：镜像基于 `ghcr.io/juneix/nas-music-kit:latest`，容器启动时会先在内部 `8080` 启动上游服务（`/api/search`、`/api/download`、`/api/lyric`、`/api/cover`），再启动 MuseFlow。默认 `UPSTREAM_BASE_URL=http://127.0.0.1:8080`，无需额外部署上游容器；如需使用外部上游，设置 `RUN_UPSTREAM=false`、清空 `UPSTREAM_LOCAL_DOWNLOAD_DIR` 并修改 `UPSTREAM_BASE_URL`。
+> **内置上游说明**：镜像基于 `ghcr.io/juneix/nas-music-kit:latest`，容器启动时会先在内部 `8080` 启动上游服务（`/api/search`、`/api/download`、`/api/lyric`、`/api/cover`），再启动 MusicFlow。默认 `UPSTREAM_BASE_URL=http://127.0.0.1:8080`，无需额外部署上游容器；如需使用外部上游，设置 `RUN_UPSTREAM=false`、清空 `UPSTREAM_LOCAL_DOWNLOAD_DIR` 并修改 `UPSTREAM_BASE_URL`。
 >
-> **目录不要混用**：`/music` 是上游固定下载目录（不要修改，也不要让 Navidrome 扫描）；MuseFlow 会把整理后的文件复制到 `/library`，Navidrome 只扫描 `/library`。旧版本数据库中若音乐库仍指向 `/music`，启动时会自动迁移到 `/library`。
+> **目录不要混用**：`/music` 是上游固定下载目录（不要修改，也不要让 Navidrome 扫描）；MusicFlow 会把整理后的文件复制到 `/library`，Navidrome 只扫描 `/library`。旧版本数据库中若音乐库仍指向 `/music`，启动时会自动迁移到 `/library`。
 >
 > `NAVIDROME_URL` 使用容器名，两个服务需在同一 Docker 网络（同一 compose 文件默认满足）；Navidrome 部署在别处时改成实际地址。
 
@@ -285,7 +285,7 @@ COLLECT_INTERVAL_MINUTES=360
 
 | 变量                     | 默认值                | 说明                     |
 | ---------------------- | ------------------ | ---------------------- |
-| `APP_NAME`             | `MuseFlow`         | 应用名称                   |
+| `APP_NAME`             | `MusicFlow`         | 应用名称                   |
 | `HOST` / `PORT`        | `0.0.0.0` / `8000` | 监听地址与端口                |
 | `TZ`                   | `Asia/Shanghai`    | 容器时区                   |
 | `TIMEZONE`             | `Asia/Shanghai`    | 定时任务时区                 |
@@ -307,7 +307,7 @@ COLLECT_INTERVAL_MINUTES=360
 | `UPSTREAM_BITRATE`            | `999`                                 | 期望码率（`999` 表示尽量取最高/Hi-Res）                                 |
 | `UPSTREAM_SOURCE_ORDER`       | `netease,netease2,kuwo,joox,bilibili` | 上游音源优先级（仅支持 `netease`、`netease2`、`bilibili`、`joox`、`kuwo`） |
 | `UPSTREAM_FILE_PATH_TEMPLATE` | `/music/{filename}`                   | 外部上游返回 JSON 文件名时，按此模板拼接音频地址                                |
-| `UPSTREAM_LOCAL_DOWNLOAD_DIR` | `/music`（镜像内）                         | 内置上游下载目录（只读），MuseFlow 从这里复制文件；留空则走 HTTP 下载                 |
+| `UPSTREAM_LOCAL_DOWNLOAD_DIR` | `/music`（镜像内）                         | 内置上游下载目录（只读），MusicFlow 从这里复制文件；留空则走 HTTP 下载                 |
 | `UPSTREAM_COVER_PATH`         | `/api/pic`                            | 上游「歌曲封面图片数据」接口路径（参数 `source`、`id`）                         |
 | `UPSTREAM_LYRIC_PATH`         | `/api/lyric`                          | 上游「仅歌词下载」接口路径                                              |
 
@@ -358,7 +358,7 @@ COLLECT_INTERVAL_MINUTES=360
 | `NAVIDROME_MATCH_MODE`                 | `strict`                | 去重匹配：`strict`（歌手+歌名）/ `loose`（歌名优先）        |
 | `NAVIDROME_AUTO_SCAN`                  | `true`                  | 入库后自动触发 Navidrome 扫库                       |
 | `NAVIDROME_SYNC_PLAYLISTS`             | `true`                  | 索引同步成功后自动创建/刷新 Navidrome 歌单                |
-| `NAVIDROME_PLAYLIST_PREFIX`            | `MuseFlow`              | 歌单名称前缀，最终名称形如 `MuseFlow · 网易云音乐`（一个平台一个歌单） |
+| `NAVIDROME_PLAYLIST_PREFIX`            | `MusicFlow`              | 歌单名称前缀，最终名称形如 `MusicFlow · 网易云音乐`（一个平台一个歌单） |
 | `NAVIDROME_PLAYLIST_REFRESH_DELAY_SEC` | `30`                    | 下载完成后等待扫库完成再刷新歌单的延迟（秒）                     |
 | `NAVIDROME_SYNC_INTERVAL_MINUTES`      | `60`                    | 曲库索引 + 歌单定时刷新间隔                            |
 
@@ -367,7 +367,7 @@ COLLECT_INTERVAL_MINUTES=360
 | 变量                  | 默认值                         | 说明                                    |
 | ------------------- | --------------------------- | ------------------------------------- |
 | `TEMP_DOWNLOAD_DIR` | `/data/downloads/temp`（镜像内） | 整理暂存目录：上游文件复制到此补标签/封面，入库后清空（不是上游下载目录） |
-| `FINAL_MUSIC_DIR`   | `/library`（镜像内）             | MuseFlow 最终音乐库，Navidrome 只扫描该目录       |
+| `FINAL_MUSIC_DIR`   | `/library`（镜像内）             | MusicFlow 最终音乐库，Navidrome 只扫描该目录       |
 
 ### Webhook 通知
 
@@ -408,7 +408,7 @@ COLLECT_INTERVAL_MINUTES=360
    - 配置 Navidrome 连接，点击「测试连接」；
    - 点击「立即同步索引」可手动触发索引同步与歌单刷新；
    - 点击「刷新歌单」仅重建 Navidrome 歌单。
-7. **Navidrome 客户端**：在歌单页即可看到 `MuseFlow · 平台名` 的 4 个歌单，各平台所有榜单已合并去重，曲目始终保持最新。
+7. **Navidrome 客户端**：在歌单页即可看到 `MusicFlow · 平台名` 的 4 个歌单，各平台所有榜单已合并去重，曲目始终保持最新。
 
 ***
 
@@ -425,7 +425,7 @@ COLLECT_INTERVAL_MINUTES=360
 
 实现细节：
 
-- 歌单名称：`{NAVIDROME_PLAYLIST_PREFIX} · {平台中文名}`，例如 `MuseFlow · 网易云音乐`；
+- 歌单名称：`{NAVIDROME_PLAYLIST_PREFIX} · {平台中文名}`，例如 `MusicFlow · 网易云音乐`；
 - **一个平台只生成一个 Navidrome 歌单**：合并该平台所有已勾选榜单的曲目并按 `track_key` 去重，按各榜单中的最好名次排序；4 个平台最终只有 4 个歌单；
 - 每次刷新会清空旧列表并写入当前最新曲目（未下载或曲库中不存在的曲目自动跳过），因此歌单只包含真正可播放的歌曲；
 - 曲目通过 Subsonic `search3` 按「歌名 + 主歌手」匹配本地曲库中的 song id，匹配成功后写入索引缓存；
@@ -446,7 +446,7 @@ COLLECT_INTERVAL_MINUTES=360
 | `GET {UPSTREAM_COVER_PATH}?source=&id=` | 歌曲封面图片数据                          |
 | `GET {UPSTREAM_LYRIC_PATH}?source=&id=` | 仅歌词（LRC）                          |
 
-MuseFlow 内置 `/api/cover` 代理封面接口，供浏览器 `<img>` 直接引用；上游不可用时前端自动回退为渐变首字封面。
+MusicFlow 内置 `/api/cover` 代理封面接口，供浏览器 `<img>` 直接引用；上游不可用时前端自动回退为渐变首字封面。
 
 自动下载的检索规则：`name` 参数只使用**歌曲名**（不含歌手），按 `UPSTREAM_SOURCE_ORDER` 从第一个音源开始逐个尝试；前一个音源没有匹配结果才尝试下一个（单个音源报错也会跳过），所有音源都失败才标记任务失败。
 
@@ -459,7 +459,7 @@ data/
 ├─ museflow.db              # SQLite：配置、榜单、曲目、任务、日志、索引缓存
 └─ downloads/temp/          # 整理暂存（补标签/封面，入库后清空）
 library/                   # 最终音乐库（按 歌手/专辑/歌曲 归档，Navidrome 扫描此目录）
-music/                     # 上游服务的下载目录（只读，MuseFlow 不写入）
+music/                     # 上游服务的下载目录（只读，MusicFlow 不写入）
 backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 ```
 
@@ -488,10 +488,13 @@ backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 控制台「系统设置」中的数据库配置优先级更高，「恢复环境变量默认值」后重启，或重新部署。
 
 **Q：镜像里为什么同时有两个服务？**
-运行时镜像基于 `ghcr.io/juneix/nas-music-kit`，容器入口会先在内部 `8080` 启动上游搜索下载服务，再在 `8000` 启动 MuseFlow。宿主机只需映射 `8000`；如需直接访问上游 Web 界面，可额外映射 `"8080:8080"`。
+运行时镜像基于 `ghcr.io/juneix/nas-music-kit`，容器入口会先在内部 `8080` 启动上游搜索下载服务，再在 `8000` 启动 MusicFlow。宿主机只需映射 `8000`；如需直接访问上游 Web 界面，可额外映射 `"8080:8080"`。
 
 **Q：升级镜像后没有使用内置上游？**
 若数据库中的上游地址仍是旧默认值 `https://music.gdstudio.xyz` 且未自定义，启动时会自动迁移到 `http://127.0.0.1:8080`。如果你手动改过配置，请在「系统设置 → 路径与上游服务」中改为 `http://127.0.0.1:8080`，或点击「恢复环境变量默认值」后重启。
+
+**Q：任务一直停留在「下载中」？**
+服务重启时会自动把中断的任务标记为失败（信息为「服务重启，任务已中断」），不再卡在下载中。可在「任务队列」或「手动下载记录」中点击「删除」清理记录，或点「重试」重新入队。
 
 **Q：端口被占用？**
 修改 `docker-compose.yml` 的 `ports`，例如 `"8080:8000"`。
@@ -500,7 +503,7 @@ backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 
 ## 支持项目
 
-MuseFlow 完全开源免费，没有广告，也不会加入任何收费功能。如果它帮你省下了手动找歌、整理入库的时间，欢迎请作者喝杯咖啡：
+MusicFlow 完全开源免费，没有广告，也不会加入任何收费功能。如果它帮你省下了手动找歌、整理入库的时间，欢迎请作者喝杯咖啡：
 
 <p align="center">
   <img src="static/wechat.png" alt="微信赞赏码" width="260" />

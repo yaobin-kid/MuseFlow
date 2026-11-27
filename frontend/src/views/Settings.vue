@@ -184,7 +184,7 @@
             </el-form-item>
             <div class="grid-2" style="gap: 12px">
               <el-form-item label="歌单名称前缀">
-                <el-input v-model="config.navidrome.playlist_prefix" placeholder="MuseFlow" />
+                <el-input v-model="config.navidrome.playlist_prefix" placeholder="MusicFlow" />
               </el-form-item>
               <el-form-item label="刷新延迟（秒）">
                 <el-input-number v-model="config.navidrome.playlist_refresh_delay_sec" :min="5" :max="900" style="width: 100%" />
@@ -224,7 +224,7 @@
             <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px">
               <template #title>三个目录的分工</template>
               <div style="font-size: 12px; line-height: 1.9">
-                <div>• <b>上游下载目录 /music</b>：由上游服务固定写入，存放未整理的音频与歌词；MuseFlow 只读取，不写入。</div>
+                <div>• <b>上游下载目录 /music</b>：由上游服务固定写入，存放未整理的音频与歌词；MusicFlow 只读取，不写入。</div>
                 <div>• <b>整理暂存目录</b>（上方设置）：写入前先把上游文件复制到这里，补全标签、嵌入封面；入库后自动清空。会短暂占用与音频等量的空间，不是上游的下载目录。</div>
                 <div>• <b>最终音乐目录 /library</b>：整理完成后归档到 歌手/专辑 子目录，Navidrome 只扫描这里。</div>
                 <div class="dim">因此「整理暂存目录」并非无用：它是标签与封面处理的工作区，避免修改上游目录里的原文件。</div>

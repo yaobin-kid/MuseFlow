@@ -39,7 +39,7 @@ class NavidromeService:
     def _auth(cfg: NavidromeConfig) -> dict:
         salt = "".join(random.choices(string.ascii_letters + string.digits, k=8))
         token = hashlib.md5((cfg.password + salt).encode("utf-8")).hexdigest()
-        return {"u": cfg.username, "t": token, "s": salt, "v": "1.16.1", "c": "MuseFlow", "f": "json"}
+        return {"u": cfg.username, "t": token, "s": salt, "v": "1.16.1", "c": "MusicFlow", "f": "json"}
 
     def _url(self, cfg: NavidromeConfig, endpoint: str) -> str:
         return cfg.url.rstrip("/") + "/rest/" + endpoint

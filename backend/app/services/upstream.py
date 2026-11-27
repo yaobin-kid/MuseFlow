@@ -25,7 +25,7 @@ class UpstreamService:
             base_url=self.cfg.base_url.rstrip("/"),
             timeout=httpx.Timeout(timeout or self.cfg.timeout_sec, connect=20.0),
             follow_redirects=True,
-            headers={"User-Agent": "MuseFlow/1.0"},
+            headers={"User-Agent": "MusicFlow/1.0"},
         )
 
     # ---------------------------------------------------------------- 搜索

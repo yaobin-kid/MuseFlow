@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ..db import fetchone
 from ..events import hub, push_task
 from ..repo import delete_task, get_task, list_tasks, set_track_status, task_counts, update_task
 from ..security import get_current_user
@@ -60,5 +61,9 @@ async def remove(task_id: int) -> dict:
     if task["status"] in ("DOWNLOADING", "PROCESSING"):
         raise HTTPException(status_code=400, detail="任务正在执行中，无法删除")
     await delete_task(task_id)
+    if task.get("track_id") and task["status"] != "COMPLETED":
+        track = await fetchone("SELECT downloaded_path FROM tracks WHERE id = ?", (task["track_id"],))
+        if track and not track["downloaded_path"]:
+            await set_track_status(task["track_id"], "PENDING")
     await hub.log("INFO", "tasks", f"任务 #{task_id} 记录已删除")
     return {"ok": True}

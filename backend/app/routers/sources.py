@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..collectors.catalog import PLATFORM_META, PLATFORM_ORDER
-from ..db import fetchone, get_runtime_config
+from ..db import fetchall, fetchone, get_runtime_config
 from ..events import hub
 from ..repo import (
     create_task,
@@ -96,6 +96,11 @@ async def playlist_tracks(
     placeholders = ",".join("?" for _ in ids)
     detailed = await get_tracks_sources(f"id IN ({placeholders})", ids)
     by_id = {item["id"]: item for item in detailed}
+    task_rows = await fetchall(
+        "SELECT track_id FROM tasks WHERE track_id IS NOT NULL "
+        "AND status IN ('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING', 'COMPLETED')"
+    )
+    task_track_ids = {row["track_id"] for row in task_rows}
     results = []
     for row in rows:
         track = by_id.get(row["id"], row)
@@ -106,6 +111,11 @@ async def playlist_tracks(
                     track["id"], evaluated["score"], evaluated["status"], evaluated["breakdown"], evaluated["platform_count"]
                 )
             track = {**track, **evaluated["breakdown"], "score": evaluated["score"], "status": evaluated["status"]}
+            # 没有对应任务的「待下载」是历史遗留状态，按得分恢复为待处理/低分过滤
+            if track["status"] == "QUEUED_DOWNLOAD" and track["id"] not in task_track_ids:
+                track["status"] = (
+                    "PENDING" if evaluated["score"] >= cfg.scoring.min_download_score else "FILTERED_LOW_SCORE"
+                )
         else:
             track = {**track, **(track.get("breakdown") or {}), "score": track.get("score", 0), "status": track.get("status")}
         track["playlist_rank"] = row.get("playlist_rank")

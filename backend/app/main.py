@@ -36,11 +36,15 @@ async def lifespan(app: FastAPI):
     apply_rate_limit_config(cfg.rate_limit.window_sec, cfg.rate_limit.max_requests)
     await ensure_playlists()
     await navidrome.load_cache()
-    interrupted = await recover_interrupted_tasks()
-    if interrupted:
-        await hub.log("WARN", "system", f"已将 {interrupted} 个重启前中断的任务标记为失败")
     await seed_demo_data(cfg)
     worker.start()
+    recovery = await recover_interrupted_tasks()
+    if recovery["failed"]:
+        await hub.log("WARN", "system", f"已将 {recovery['failed']} 个重启前中断的任务标记为失败")
+    for task_id, priority in recovery["queued"]:
+        await worker.enqueue(task_id, priority)
+    if recovery["queued"]:
+        await hub.log("INFO", "system", f"已恢复 {len(recovery['queued'])} 个排队任务，继续自动下载")
     start_scheduler()
     await hub.log(
         "INFO",

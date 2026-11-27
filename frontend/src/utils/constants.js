@@ -34,7 +34,7 @@ export function statusMeta(status) {
 
 export const STATUS_FILTERS = [
   { value: '', label: '全部' },
-  { value: 'QUEUED_DOWNLOAD,WAITING', label: '排队中' },
+  { value: 'QUEUED,WAITING', label: '排队中' },
   { value: 'DOWNLOADING,PROCESSING', label: '进行中' },
   { value: 'COMPLETED', label: '已入库' },
   { value: 'SKIPPED_EXISTS', label: '已跳过' },

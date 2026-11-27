@@ -262,29 +262,42 @@ async def delete_task(task_id: int) -> None:
     await execute("DELETE FROM tasks WHERE id = ?", (task_id,))
 
 
-async def recover_interrupted_tasks() -> int:
-    """服务重启后，把内存队列中已丢失的任务标记为失败，避免一直停留在下载中。"""
-    row = await fetchone(
-        "SELECT COUNT(*) AS cnt FROM tasks "
-        "WHERE status IN ('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING')"
-    )
-    count = row["cnt"] if row else 0
-    if not count:
-        return 0
+async def recover_interrupted_tasks() -> dict:
+    """重启恢复：中断的执行中任务标记失败，排队任务返回给调用方重新入队。"""
     ts = now_iso()
-    await execute(
-        "UPDATE tracks SET status = 'FAILED' WHERE id IN ("
-        "SELECT track_id FROM tasks WHERE track_id IS NOT NULL "
-        "AND status IN ('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING')) "
-        "AND status != 'COMPLETED'"
+    row = await fetchone(
+        "SELECT COUNT(*) AS cnt FROM tasks WHERE status IN ('DOWNLOADING', 'PROCESSING')"
     )
-    await execute(
-        "UPDATE tasks SET status = 'FAILED', message = '服务重启，任务已中断', "
-        "finished_at = ?, updated_at = ? "
-        "WHERE status IN ('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING')",
-        (ts, ts),
+    failed = row["cnt"] if row else 0
+    if failed:
+        await execute(
+            "UPDATE tracks SET status = 'FAILED' WHERE id IN ("
+            "SELECT track_id FROM tasks WHERE track_id IS NOT NULL "
+            "AND status IN ('DOWNLOADING', 'PROCESSING')) "
+            "AND status != 'COMPLETED'"
+        )
+        await execute(
+            "UPDATE tasks SET status = 'FAILED', message = '服务重启，任务已中断', "
+            "finished_at = ?, updated_at = ? "
+            "WHERE status IN ('DOWNLOADING', 'PROCESSING')",
+            (ts, ts),
+        )
+
+    queued = await fetchall(
+        "SELECT id, mode FROM tasks WHERE status IN ('QUEUED', 'WAITING') ORDER BY id"
     )
-    return count
+
+    # 没有对应任务记录的「待下载」曲目（例如演示数据或任务被删除）恢复为待处理，
+    # 否则会一直显示待下载且无法再次触发下载。
+    await execute(
+        "UPDATE tracks SET status = 'PENDING' WHERE status = 'QUEUED_DOWNLOAD' AND id NOT IN ("
+        "SELECT track_id FROM tasks WHERE track_id IS NOT NULL AND status IN "
+        "('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING', 'COMPLETED'))"
+    )
+    return {
+        "failed": failed,
+        "queued": [(item["id"], 0 if item["mode"] == "manual" else 10) for item in queued],
+    }
 
 
 async def task_counts() -> dict[str, int]:

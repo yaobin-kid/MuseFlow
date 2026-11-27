@@ -4,7 +4,7 @@ MuseFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ
 
 一个容器即可跑起来，前端构建产物由 FastAPI 直接托管。
 
----
+***
 
 ## 功能特性
 
@@ -26,15 +26,15 @@ MuseFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ
 - **演示模式**：`DEMO_MODE=true` 时首次启动自动生成示例数据，无网络也能完整体验界面
 - **内置上游服务**：Docker 镜像基于 `ghcr.io/juneix/nas-music-kit`，同一容器内自动启动上游搜索/下载/歌词/封面 API（8080 内部端口），开箱即用
 
----
+***
 
 ## 技术栈与架构
 
-| 层 | 技术 |
-| --- | --- |
+| 层  | 技术                                                       |
+| -- | -------------------------------------------------------- |
 | 后端 | Python 3.11+ · FastAPI · APScheduler · SQLite（aiosqlite） |
-| 前端 | Vue 3 · Vite · Element Plus · ECharts |
-| 部署 | 单容器：MuseFlow + 内置上游服务，前端构建产物由 FastAPI 托管在 `/` |
+| 前端 | Vue 3 · Vite · Element Plus · ECharts                    |
+| 部署 | 单容器：MuseFlow + 内置上游服务，前端构建产物由 FastAPI 托管在 `/`            |
 
 ```text
 ┌────────────────────────────┐
@@ -53,7 +53,7 @@ MuseFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ
   SQLite /data    音乐库 /library ──► Navidrome
 ```
 
----
+***
 
 ## 快速开始
 
@@ -119,7 +119,7 @@ cd ..\backend
 
 > 前后端分离调试：`cd frontend && npm run dev`，Vite 已配置 `/api` 与 `/ws` 代理到后端。
 
----
+***
 
 ## Docker Compose 配置
 
@@ -160,20 +160,20 @@ services:
 
 ### 目录约定（重要）
 
-| 容器路径 | 宿主机路径 | 归属 | 说明 |
-| --- | --- | --- | --- |
-| `/music` | `./music` | 上游服务专用 | 上游固定下载目录，MuseFlow **只读**读取，绝不写入 |
+| 容器路径       | 宿主机路径       | 归属       | 说明                              |
+| ---------- | ----------- | -------- | ------------------------------- |
+| `/music`   | `./music`   | 上游服务专用   | 上游固定下载目录，MuseFlow **只读**读取，绝不写入 |
 | `/library` | `./library` | MuseFlow | 最终音乐库（按歌手/专辑归档），Navidrome 只扫描这里 |
-| `/data` | `./data` | MuseFlow | SQLite 数据库、日志、整理暂存文件 |
+| `/data`    | `./data`    | MuseFlow | SQLite 数据库、日志、整理暂存文件            |
 
-| 配置项 | 说明 |
-| --- | --- |
-| `build.args.NPM_REGISTRY` / `PIP_INDEX_URL` | 前端 / Python 依赖镜像源，国内网络建议保留 |
-| `ports` | 左侧为宿主机端口，可改为 `"8080:8000"` 等 |
-| `FINAL_MUSIC_DIR=/library` | 必须与 `./library:/library` 挂载一致 |
-| `RUN_UPSTREAM` / `UPSTREAM_PORT` | 内置上游开关与内部端口（默认 8080，仅容器内） |
-| `./music:/music` | 改为 NAS 实际路径，例如 `/volume1/upstream-music:/music` |
-| `./library:/library` | 改为 NAS 实际路径，例如 `/volume1/museflow-library:/library` |
+| 配置项                                         | 说明                                                  |
+| ------------------------------------------- | --------------------------------------------------- |
+| `build.args.NPM_REGISTRY` / `PIP_INDEX_URL` | 前端 / Python 依赖镜像源，国内网络建议保留                          |
+| `ports`                                     | 左侧为宿主机端口，可改为 `"8080:8000"` 等                        |
+| `FINAL_MUSIC_DIR=/library`                  | 必须与 `./library:/library` 挂载一致                       |
+| `RUN_UPSTREAM` / `UPSTREAM_PORT`            | 内置上游开关与内部端口（默认 8080，仅容器内）                           |
+| `./music:/music`                            | 改为 NAS 实际路径，例如 `/volume1/upstream-music:/music`     |
+| `./library:/library`                        | 改为 NAS 实际路径，例如 `/volume1/museflow-library:/library` |
 
 ### 完整版：MuseFlow + Navidrome 一起部署
 
@@ -275,7 +275,7 @@ COLLECT_INTERVAL_MINUTES=360
 >
 > `NAVIDROME_URL` 使用容器名，两个服务需在同一 Docker 网络（同一 compose 文件默认满足）；Navidrome 部署在别处时改成实际地址。
 
----
+***
 
 ## 环境变量说明
 
@@ -283,118 +283,118 @@ COLLECT_INTERVAL_MINUTES=360
 
 ### 基础
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `APP_NAME` | `MuseFlow` | 应用名称 |
-| `HOST` / `PORT` | `0.0.0.0` / `8000` | 监听地址与端口 |
-| `TZ` | `Asia/Shanghai` | 容器时区 |
-| `TIMEZONE` | `Asia/Shanghai` | 定时任务时区 |
-| `DATA_DIR` | `./data` | 数据目录（SQLite、日志、临时文件） |
-| `ADMIN_USERNAME` | `admin` | 登录账号 |
-| `ADMIN_PASSWORD` | `admin123` | 登录密码（**生产环境必须修改**） |
-| `SECRET_KEY` | 内置示例值 | JWT 签名密钥（**生产环境必须修改**） |
-| `TOKEN_EXPIRE_MINUTES` | `10080` | 登录有效期（分钟，默认 7 天） |
-| `DEMO_MODE` | `true` | 演示模式：空库时生成示例数据 |
-| `COLLECT_ON_STARTUP` | `false` | 启动后立即执行一次采集 |
-| `CORS_ORIGINS` | `*` | 允许的跨域来源，逗号分隔 |
+| 变量                     | 默认值                | 说明                     |
+| ---------------------- | ------------------ | ---------------------- |
+| `APP_NAME`             | `MuseFlow`         | 应用名称                   |
+| `HOST` / `PORT`        | `0.0.0.0` / `8000` | 监听地址与端口                |
+| `TZ`                   | `Asia/Shanghai`    | 容器时区                   |
+| `TIMEZONE`             | `Asia/Shanghai`    | 定时任务时区                 |
+| `DATA_DIR`             | `./data`           | 数据目录（SQLite、日志、临时文件）   |
+| `ADMIN_USERNAME`       | `admin`            | 登录账号                   |
+| `ADMIN_PASSWORD`       | `admin123`         | 登录密码（**生产环境必须修改**）     |
+| `SECRET_KEY`           | 内置示例值              | JWT 签名密钥（**生产环境必须修改**） |
+| `TOKEN_EXPIRE_MINUTES` | `10080`            | 登录有效期（分钟，默认 7 天）       |
+| `DEMO_MODE`            | `true`             | 演示模式：空库时生成示例数据         |
+| `COLLECT_ON_STARTUP`   | `false`            | 启动后立即执行一次采集            |
+| `CORS_ORIGINS`         | `*`                | 允许的跨域来源，逗号分隔           |
 
 ### 上游音源服务
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `UPSTREAM_BASE_URL` | `http://127.0.0.1:8080`（镜像内） | 上游搜索/下载服务地址，指向外部上游时改为其地址 |
-| `UPSTREAM_TIMEOUT_SEC` | `60` | 上游请求超时（秒） |
-| `UPSTREAM_BITRATE` | `999` | 期望码率（`999` 表示尽量取最高/Hi-Res） |
-| `UPSTREAM_SOURCE_ORDER` | `netease,netease2,kuwo,joox,bilibili` | 上游音源优先级（仅支持 `netease`、`netease2`、`bilibili`、`joox`、`kuwo`） |
-| `UPSTREAM_FILE_PATH_TEMPLATE` | `/music/{filename}` | 外部上游返回 JSON 文件名时，按此模板拼接音频地址 |
-| `UPSTREAM_LOCAL_DOWNLOAD_DIR` | `/music`（镜像内） | 内置上游下载目录（只读），MuseFlow 从这里复制文件；留空则走 HTTP 下载 |
-| `UPSTREAM_COVER_PATH` | `/api/pic` | 上游「歌曲封面图片数据」接口路径（参数 `source`、`id`） |
-| `UPSTREAM_LYRIC_PATH` | `/api/lyric` | 上游「仅歌词下载」接口路径 |
+| 变量                            | 默认值                                   | 说明                                                         |
+| ----------------------------- | ------------------------------------- | ---------------------------------------------------------- |
+| `UPSTREAM_BASE_URL`           | `http://127.0.0.1:8080`（镜像内）          | 上游搜索/下载服务地址，指向外部上游时改为其地址                                   |
+| `UPSTREAM_TIMEOUT_SEC`        | `60`                                  | 上游请求超时（秒）                                                  |
+| `UPSTREAM_BITRATE`            | `999`                                 | 期望码率（`999` 表示尽量取最高/Hi-Res）                                 |
+| `UPSTREAM_SOURCE_ORDER`       | `netease,netease2,kuwo,joox,bilibili` | 上游音源优先级（仅支持 `netease`、`netease2`、`bilibili`、`joox`、`kuwo`） |
+| `UPSTREAM_FILE_PATH_TEMPLATE` | `/music/{filename}`                   | 外部上游返回 JSON 文件名时，按此模板拼接音频地址                                |
+| `UPSTREAM_LOCAL_DOWNLOAD_DIR` | `/music`（镜像内）                         | 内置上游下载目录（只读），MuseFlow 从这里复制文件；留空则走 HTTP 下载                 |
+| `UPSTREAM_COVER_PATH`         | `/api/pic`                            | 上游「歌曲封面图片数据」接口路径（参数 `source`、`id`）                         |
+| `UPSTREAM_LYRIC_PATH`         | `/api/lyric`                          | 上游「仅歌词下载」接口路径                                              |
 
 ### 内置上游进程（仅 Docker 镜像）
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `RUN_UPSTREAM` | `true` | 是否在容器内启动内置上游服务；使用外部上游时设为 `false` |
-| `UPSTREAM_PORT` | `8080` | 内置上游监听端口（仅容器内部，默认不对宿主机暴露） |
+| 变量              | 默认值    | 说明                               |
+| --------------- | ------ | -------------------------------- |
+| `RUN_UPSTREAM`  | `true` | 是否在容器内启动内置上游服务；使用外部上游时设为 `false` |
+| `UPSTREAM_PORT` | `8080` | 内置上游监听端口（仅容器内部，默认不对宿主机暴露）        |
 
 ### 网络与防风控
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `PROXY_URL` | 空 | HTTP / SOCKS5 代理，例如 `http://192.168.1.2:7890` |
-| `FLARESOLVERR_ENABLED` | `false` | 是否启用 FlareSolverr 过盾 |
-| `FLARESOLVERR_URL` | `http://flaresolverr:8191/v1` | FlareSolverr 地址 |
-| `FLARESOLVERR_TIMEOUT_SEC` | `60` | 过盾超时 |
-| `COOLDOWN_BASE_SEC` | `15` | 同平台歌单之间的基础冷却 |
-| `COOLDOWN_JITTER_SEC` | `10` | 冷却随机抖动上限 |
+| 变量                         | 默认值                           | 说明                                            |
+| -------------------------- | ----------------------------- | --------------------------------------------- |
+| `PROXY_URL`                | 空                             | HTTP / SOCKS5 代理，例如 `http://192.168.1.2:7890` |
+| `FLARESOLVERR_ENABLED`     | `false`                       | 是否启用 FlareSolverr 过盾                          |
+| `FLARESOLVERR_URL`         | `http://flaresolverr:8191/v1` | FlareSolverr 地址                               |
+| `FLARESOLVERR_TIMEOUT_SEC` | `60`                          | 过盾超时                                          |
+| `COOLDOWN_BASE_SEC`        | `15`                          | 同平台歌单之间的基础冷却                                  |
+| `COOLDOWN_JITTER_SEC`      | `10`                          | 冷却随机抖动上限                                      |
 
 ### 限流
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `RATE_LIMIT_WINDOW_SEC` | `300` | 滑动窗口长度（秒） |
-| `RATE_LIMIT_MAX_REQUESTS` | `50` | 窗口内允许的上游请求数 |
+| 变量                        | 默认值   | 说明          |
+| ------------------------- | ----- | ----------- |
+| `RATE_LIMIT_WINDOW_SEC`   | `300` | 滑动窗口长度（秒）   |
+| `RATE_LIMIT_MAX_REQUESTS` | `50`  | 窗口内允许的上游请求数 |
 
 ### 动态打分
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `MIN_DOWNLOAD_SCORE` | `75` | 高分准入门槛，低于该分数不下载 |
-| `WEIGHT_NETEASE` | `0.15` | 网易云权重 |
-| `WEIGHT_QQ` | `0.15` | QQ 音乐权重 |
-| `WEIGHT_SPOTIFY` | `0.35` | Spotify 权重（默认偏高以纳入英文热门） |
-| `WEIGHT_APPLE` | `0.35` | Apple Music 权重（默认偏高以纳入英文热门） |
-| `BLACKLIST_KEYWORDS` | `DJ,喊麦,伴奏,铃声,串烧` | 黑名单关键词，逗号分隔 |
+| 变量                   | 默认值              | 说明                          |
+| -------------------- | ---------------- | --------------------------- |
+| `MIN_DOWNLOAD_SCORE` | `75`             | 高分准入门槛，低于该分数不下载             |
+| `WEIGHT_NETEASE`     | `0.15`           | 网易云权重                       |
+| `WEIGHT_QQ`          | `0.15`           | QQ 音乐权重                     |
+| `WEIGHT_SPOTIFY`     | `0.35`           | Spotify 权重（默认偏高以纳入英文热门）     |
+| `WEIGHT_APPLE`       | `0.35`           | Apple Music 权重（默认偏高以纳入英文热门） |
+| `BLACKLIST_KEYWORDS` | `DJ,喊麦,伴奏,铃声,串烧` | 黑名单关键词，逗号分隔                 |
 
 ### Navidrome
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `NAVIDROME_ENABLED` | `false` | 启用 Navidrome 去重与歌单同步 |
-| `NAVIDROME_URL` | `http://navidrome:4533` | Navidrome 地址（Subsonic API 根） |
-| `NAVIDROME_USERNAME` | `admin` | Subsonic 用户名 |
-| `NAVIDROME_PASSWORD` | 空 | Subsonic 密码 |
-| `NAVIDROME_MATCH_MODE` | `strict` | 去重匹配：`strict`（歌手+歌名）/ `loose`（歌名优先） |
-| `NAVIDROME_AUTO_SCAN` | `true` | 入库后自动触发 Navidrome 扫库 |
-| `NAVIDROME_SYNC_PLAYLISTS` | `true` | 索引同步成功后自动创建/刷新 Navidrome 歌单 |
-| `NAVIDROME_PLAYLIST_PREFIX` | `MuseFlow` | 歌单名称前缀，最终名称形如 `MuseFlow · 网易云音乐`（一个平台一个歌单） |
-| `NAVIDROME_PLAYLIST_REFRESH_DELAY_SEC` | `30` | 下载完成后等待扫库完成再刷新歌单的延迟（秒） |
-| `NAVIDROME_SYNC_INTERVAL_MINUTES` | `60` | 曲库索引 + 歌单定时刷新间隔 |
+| 变量                                     | 默认值                     | 说明                                         |
+| -------------------------------------- | ----------------------- | ------------------------------------------ |
+| `NAVIDROME_ENABLED`                    | `false`                 | 启用 Navidrome 去重与歌单同步                       |
+| `NAVIDROME_URL`                        | `http://navidrome:4533` | Navidrome 地址（Subsonic API 根）               |
+| `NAVIDROME_USERNAME`                   | `admin`                 | Subsonic 用户名                               |
+| `NAVIDROME_PASSWORD`                   | 空                       | Subsonic 密码                                |
+| `NAVIDROME_MATCH_MODE`                 | `strict`                | 去重匹配：`strict`（歌手+歌名）/ `loose`（歌名优先）        |
+| `NAVIDROME_AUTO_SCAN`                  | `true`                  | 入库后自动触发 Navidrome 扫库                       |
+| `NAVIDROME_SYNC_PLAYLISTS`             | `true`                  | 索引同步成功后自动创建/刷新 Navidrome 歌单                |
+| `NAVIDROME_PLAYLIST_PREFIX`            | `MuseFlow`              | 歌单名称前缀，最终名称形如 `MuseFlow · 网易云音乐`（一个平台一个歌单） |
+| `NAVIDROME_PLAYLIST_REFRESH_DELAY_SEC` | `30`                    | 下载完成后等待扫库完成再刷新歌单的延迟（秒）                     |
+| `NAVIDROME_SYNC_INTERVAL_MINUTES`      | `60`                    | 曲库索引 + 歌单定时刷新间隔                            |
 
 ### 目录
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
+| 变量                  | 默认值                         | 说明                                    |
+| ------------------- | --------------------------- | ------------------------------------- |
 | `TEMP_DOWNLOAD_DIR` | `/data/downloads/temp`（镜像内） | 整理暂存目录：上游文件复制到此补标签/封面，入库后清空（不是上游下载目录） |
-| `FINAL_MUSIC_DIR` | `/library`（镜像内） | MuseFlow 最终音乐库，Navidrome 只扫描该目录 |
+| `FINAL_MUSIC_DIR`   | `/library`（镜像内）             | MuseFlow 最终音乐库，Navidrome 只扫描该目录       |
 
 ### Webhook 通知
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `WEBHOOK_ENABLED` | `false` | 是否启用通知 |
-| `WEBHOOK_TYPE` | `generic` | `generic` / `telegram` / `bark` / `wecom` / `dingtalk` / `discord` |
-| `WEBHOOK_URL` | 空 | 通知地址 |
-| `WEBHOOK_EVENTS` | `job_completed,manual_download_completed,error_alert` | 订阅事件，逗号分隔 |
+| 变量                | 默认值                                                   | 说明                                                                 |
+| ----------------- | ----------------------------------------------------- | ------------------------------------------------------------------ |
+| `WEBHOOK_ENABLED` | `false`                                               | 是否启用通知                                                             |
+| `WEBHOOK_TYPE`    | `generic`                                             | `generic` / `telegram` / `bark` / `wecom` / `dingtalk` / `discord` |
+| `WEBHOOK_URL`     | 空                                                     | 通知地址                                                               |
+| `WEBHOOK_EVENTS`  | `job_completed,manual_download_completed,error_alert` | 订阅事件，逗号分隔                                                          |
 
 ### 定时任务
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `SCHEDULER_ENABLED` | `true` | 启用定时调度 |
-| `COLLECT_INTERVAL_MINUTES` | `360` | 榜单采集间隔（分钟） |
+| 变量                         | 默认值    | 说明         |
+| -------------------------- | ------ | ---------- |
+| `SCHEDULER_ENABLED`        | `true` | 启用定时调度     |
+| `COLLECT_INTERVAL_MINUTES` | `360`  | 榜单采集间隔（分钟） |
 
 ### Spotify
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `SPOTIFY_CLIENT_ID` | 空 | Spotify 应用 Client ID（香港/台湾等市场需要） |
-| `SPOTIFY_CLIENT_SECRET` | 空 | Spotify 应用 Client Secret |
-| `SPOTIFY_MARKET` | `TW` | 默认市场 |
-| `SPOTIFY_PLAYLISTS_JSON` | 空 | 自定义歌单 JSON，覆盖内置 9 个 Top 50，如 `[{"id":"37i9dQZEVXbMDoHDwVN2tF","name":"Global Top 50"}]` |
+| 变量                       | 默认值  | 说明                                                                                      |
+| ------------------------ | ---- | --------------------------------------------------------------------------------------- |
+| `SPOTIFY_CLIENT_ID`      | 空    | Spotify 应用 Client ID（香港/台湾等市场需要）                                                        |
+| `SPOTIFY_CLIENT_SECRET`  | 空    | Spotify 应用 Client Secret                                                                |
+| `SPOTIFY_MARKET`         | `TW` | 默认市场                                                                                    |
+| `SPOTIFY_PLAYLISTS_JSON` | 空    | 自定义歌单 JSON，覆盖内置 9 个 Top 50，如 `[{"id":"37i9dQZEVXbMDoHDwVN2tF","name":"Global Top 50"}]` |
 
----
+***
 
 ## 使用指南
 
@@ -410,7 +410,7 @@ COLLECT_INTERVAL_MINUTES=360
    - 点击「刷新歌单」仅重建 Navidrome 歌单。
 7. **Navidrome 客户端**：在歌单页即可看到 `MuseFlow · 平台名` 的 4 个歌单，各平台所有榜单已合并去重，曲目始终保持最新。
 
----
+***
 
 ## Navidrome 歌单同步机制
 
@@ -435,22 +435,22 @@ COLLECT_INTERVAL_MINUTES=360
 
 前端「系统设置 → Navidrome」中可查看已同步歌单数与曲目数，并手动触发刷新。
 
----
+***
 
 ## 上游 API 说明
 
-| 接口 | 用途 |
-| --- | --- |
-| `GET /api/search` | 多源搜索，按 `UPSTREAM_SOURCE_ORDER` 聚合 |
-| `GET /api/download` | 获取音频；可能直接返回音频流，或返回包含文件名的 JSON |
-| `GET {UPSTREAM_COVER_PATH}?source=&id=` | 歌曲封面图片数据 |
-| `GET {UPSTREAM_LYRIC_PATH}?source=&id=` | 仅歌词（LRC） |
+| 接口                                      | 用途                                |
+| --------------------------------------- | --------------------------------- |
+| `GET /api/search`                       | 多源搜索，按 `UPSTREAM_SOURCE_ORDER` 聚合 |
+| `GET /api/download`                     | 获取音频；可能直接返回音频流，或返回包含文件名的 JSON     |
+| `GET {UPSTREAM_COVER_PATH}?source=&id=` | 歌曲封面图片数据                          |
+| `GET {UPSTREAM_LYRIC_PATH}?source=&id=` | 仅歌词（LRC）                          |
 
 MuseFlow 内置 `/api/cover` 代理封面接口，供浏览器 `<img>` 直接引用；上游不可用时前端自动回退为渐变首字封面。
 
 自动下载的检索规则：`name` 参数只使用**歌曲名**（不含歌手），按 `UPSTREAM_SOURCE_ORDER` 从第一个音源开始逐个尝试；前一个音源没有匹配结果才尝试下一个（单个音源报错也会跳过），所有音源都失败才标记任务失败。
 
----
+***
 
 ## 数据与目录结构
 
@@ -465,7 +465,7 @@ backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 
 如需从演示数据切换到干净环境：删除 `data/museflow.db`（Docker 为挂载的 `./data/museflow.db`）后重启即可重新初始化。
 
----
+***
 
 ## 常见问题
 
@@ -496,7 +496,19 @@ backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 **Q：端口被占用？**
 修改 `docker-compose.yml` 的 `ports`，例如 `"8080:8000"`。
 
----
+***
+
+## 支持项目
+
+MuseFlow 完全开源免费，没有广告，也不会加入任何收费功能。如果它帮你省下了手动找歌、整理入库的时间，欢迎请作者喝杯咖啡：
+
+<p align="center">
+  <img src="static/wechat.png" alt="微信赞赏码" width="260" />
+</p>
+
+<p align="center"><sub>赞赏完全自愿，不影响任何功能。你的使用与反馈就是最大的支持。</sub></p>
+
+***
 
 ## 免责声明
 

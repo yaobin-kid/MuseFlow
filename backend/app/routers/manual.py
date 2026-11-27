@@ -10,6 +10,8 @@ from ..db import get_runtime_config
 from ..events import hub
 from ..repo import create_task, get_task
 from ..security import get_current_user
+from ..services.navidrome import navidrome
+from ..services.normalize import display_title, joined_artist, make_track_key
 from ..services.queue import worker
 from ..services.rate_limiter import limiter
 from ..services.upstream import UpstreamService
@@ -51,6 +53,8 @@ async def search(
     except Exception as exc:  # noqa: BLE001
         await hub.log("WARN", "manual", f"上游搜索失败：{exc}")
         raise HTTPException(status_code=502, detail=f"上游搜索失败: {exc}")
+    for item in items:
+        item["exists_in_library"] = _exists_in_library(cfg, item)
     return {"items": items, "quota": limiter.usage()}
 
 
@@ -59,6 +63,9 @@ async def download(payload: DownloadPayload) -> dict:
     item = payload.item or {}
     if not item.get("id") or not item.get("source"):
         raise HTTPException(status_code=400, detail="缺少上游曲目信息（source/id）")
+    cfg = get_runtime_config()
+    if _exists_in_library(cfg, item):
+        raise HTTPException(status_code=409, detail="Navidrome 曲库中已存在该歌曲，已跳过下载")
     task_id = await create_task(
         track_id=None,
         title=item.get("name", ""),
@@ -75,6 +82,16 @@ async def download(payload: DownloadPayload) -> dict:
     await worker.enqueue(task_id, 0)
     await hub.log("INFO", "manual", f"手动直下入队：{item.get('artist')} - {item.get('name')}")
     return {"ok": True, "task": await get_task(task_id)}
+
+
+def _exists_in_library(cfg, item: dict) -> bool:
+    if not cfg.navidrome.enabled:
+        return False
+    title = display_title(item.get("name", ""))
+    artists = item.get("artist") or []
+    artist = joined_artist(artists)
+    track_key = make_track_key(artists, title, item.get("isrc") or "")
+    return navidrome.is_present(track_key, artist, title, cfg.navidrome.match_mode)
 
 
 def _artist(value) -> str:

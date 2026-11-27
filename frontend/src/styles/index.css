@@ -643,6 +643,18 @@ a {
   box-shadow: 0 8px 20px rgba(109, 77, 242, 0.24);
 }
 
+.el-button--primary.is-plain {
+  --el-button-text-color: #6d4df2;
+  --el-button-bg-color: rgba(109, 77, 242, 0.1);
+  --el-button-border-color: rgba(109, 77, 242, 0.35);
+  --el-button-hover-text-color: #6d4df2;
+  --el-button-hover-bg-color: rgba(109, 77, 242, 0.18);
+  --el-button-hover-border-color: #6d4df2;
+  background-image: none;
+  border: 1px solid rgba(109, 77, 242, 0.35);
+  box-shadow: none;
+}
+
 .el-button {
   border-radius: 9px;
 }

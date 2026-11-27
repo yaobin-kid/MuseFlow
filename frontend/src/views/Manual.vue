@@ -2,7 +2,7 @@
   <div>
     <div class="info-banner cyan">
       <el-icon><InfoFilled /></el-icon>
-      手动直下跳过打分过滤与 Navidrome 去重限制，直接消耗当前滑动窗口配额，优先于自动任务执行。
+      手动直下跳过打分过滤，但仍会检测 Navidrome 曲库，已存在则跳过下载；下载会消耗当前滑动窗口配额，优先于自动任务执行。
     </div>
 
     <div class="card">
@@ -51,7 +51,8 @@
           </el-table-column>
           <el-table-column label="操作" width="120" align="right">
             <template #default="{ row }">
-              <el-button size="small" type="primary" plain @click="download(row)">
+              <el-tag v-if="row.exists_in_library" type="success" size="small" effect="plain">曲库已有</el-tag>
+              <el-button v-else size="small" type="primary" plain @click="download(row)">
                 <el-icon><Download /></el-icon>&nbsp;下载
               </el-button>
             </template>
@@ -171,7 +172,13 @@ async function download(row) {
     ElMessage.success(`已提交下载：${row.name}`)
     loadManualTasks()
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || '提交下载失败')
+    const detail = error.response?.data?.detail || '提交下载失败'
+    if (error.response?.status === 409) {
+      row.exists_in_library = true
+      ElMessage.warning(detail)
+    } else {
+      ElMessage.error(detail)
+    }
   }
 }
 

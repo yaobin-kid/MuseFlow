@@ -1,7 +1,15 @@
 import dayjs from 'dayjs'
 
-export const PLATFORM_META = {
-  netease: { name: '网易云音乐', short: '网易云', color: '#d81e3f', bg: 'rgba(216,30,63,.1)' },
+// 上游搜索/下载 API 支持的 source（与后端 SUPPORTED_UPSTREAM_SOURCES 保持一致）
+export const UPSTREAM_SOURCES = [
+  { value: 'netease', label: 'netease（网易云 1）' },
+  { value: 'netease2', label: 'netease2（网易云 2）' },
+  { value: 'bilibili', label: 'bilibili（B 站）' },
+  { value: 'joox', label: 'joox（JOOX）' },
+  { value: 'kuwo', label: 'kuwo（酷我）' }
+]
+
+export const PLATFORM_META = {  netease: { name: '网易云音乐', short: '网易云', color: '#d81e3f', bg: 'rgba(216,30,63,.1)' },
   qq: { name: 'QQ 音乐', short: 'QQ音乐', color: '#0f9f63', bg: 'rgba(15,159,99,.1)' },
   spotify: { name: 'Spotify', short: 'Spotify', color: '#0d9b45', bg: 'rgba(13,155,69,.1)' },
   apple: { name: 'Apple Music', short: 'Apple', color: '#e11d48', bg: 'rgba(225,29,72,.1)' }

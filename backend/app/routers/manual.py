@@ -6,6 +6,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from ..config import SUPPORTED_UPSTREAM_SOURCES
 from ..db import get_runtime_config
 from ..events import hub
 from ..repo import create_task, get_task
@@ -39,6 +40,11 @@ async def search(
         raise HTTPException(
             status_code=429,
             detail=f"上游 5 分钟配额已用尽，请等待 {int(wait)} 秒后再试",
+        )
+    if source and source not in SUPPORTED_UPSTREAM_SOURCES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的音源：{source}，仅支持 {'、'.join(SUPPORTED_UPSTREAM_SOURCES)}",
         )
     await limiter.acquire()
     cfg = get_runtime_config()

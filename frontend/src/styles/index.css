@@ -633,7 +633,7 @@ a {
   box-shadow: 0 0 0 1px rgba(109, 77, 242, 0.65) inset !important;
 }
 
-.el-button--primary {
+.el-button--primary:not(.is-plain):not(.is-text):not(.is-link) {
   --el-button-bg-color: #6d4df2;
   --el-button-border-color: #6d4df2;
   --el-button-hover-bg-color: #7f63f5;
@@ -641,6 +641,16 @@ a {
   background-image: linear-gradient(135deg, #6d4df2, #5b3ee0);
   border: none;
   box-shadow: 0 8px 20px rgba(109, 77, 242, 0.24);
+}
+
+.el-button--primary.is-text,
+.el-button--primary.is-link {
+  --el-button-text-color: #6d4df2;
+  --el-button-hover-text-color: #5b3ee0;
+  --el-button-hover-bg-color: rgba(109, 77, 242, 0.12);
+  background-image: none;
+  border: none;
+  box-shadow: none;
 }
 
 .el-button--primary.is-plain {

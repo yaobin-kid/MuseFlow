@@ -8,18 +8,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ..collectors.catalog import PLATFORM_META, PLATFORM_ORDER
-from ..db import get_runtime_config
+from ..db import fetchone, get_runtime_config
+from ..events import hub
 from ..repo import (
+    create_task,
     ensure_playlists,
     get_playlist,
     get_tracks_sources,
     list_playlist_tracks,
     list_playlists,
     set_playlist_scheduled,
+    set_track_status,
     update_track_score,
 )
 from ..security import get_current_user
+from ..services.navidrome import navidrome
 from ..services.pipeline import evaluate_track, is_running, run_collection
+from ..services.queue import worker
 from ..services.rate_limiter import cooldown_snapshot
 
 router = APIRouter(prefix="/api/sources", tags=["sources"], dependencies=[Depends(get_current_user)])
@@ -112,6 +117,53 @@ async def playlist_tracks(
     # 默认按最终得分从高到低排序，同分时保持榜单原始名次
     results.sort(key=lambda item: (-(item.get("score") or 0), item.get("playlist_rank") or 0))
     return {"playlist": playlist, "tracks": results}
+
+
+@router.post("/tracks/{track_id}/download")
+async def download_track(track_id: int) -> dict:
+    """低分/被过滤的曲目手动触发下载，复用自动下载的检索与整理流程。"""
+    rows = await get_tracks_sources("id = ?", (track_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="曲目不存在")
+    track = rows[0]
+    if track.get("downloaded_path"):
+        raise HTTPException(status_code=409, detail="该歌曲已入库，无需重复下载")
+
+    cfg = get_runtime_config()
+    if cfg.navidrome.enabled and navidrome.is_present(
+        track["track_key"],
+        track.get("artist", ""),
+        track.get("title", ""),
+        cfg.navidrome.match_mode,
+    ):
+        raise HTTPException(status_code=409, detail="Navidrome 曲库中已存在该歌曲")
+
+    active = await fetchone(
+        "SELECT id, status FROM tasks WHERE track_id = ? AND status IN "
+        "('QUEUED', 'WAITING', 'DOWNLOADING', 'PROCESSING', 'COMPLETED') "
+        "ORDER BY id DESC LIMIT 1",
+        (track_id,),
+    )
+    if active:
+        raise HTTPException(status_code=409, detail=f"任务 #{active['id']} 已存在（{active['status']}）")
+
+    sources = track.get("sources") or []
+    task_id = await create_task(
+        track_id=track_id,
+        title=track["title"],
+        artist=track.get("artist", ""),
+        album=track.get("album", ""),
+        cover=track.get("cover", ""),
+        platform=sources[0]["platform"] if sources else "",
+        mode="manual",
+        priority=0,
+    )
+    await set_track_status(track_id, "QUEUED_DOWNLOAD")
+    await worker.enqueue(task_id, 0)
+    await hub.log(
+        "INFO", "sources", f"手动触发下载：{track.get('artist')} - {track['title']}（任务 #{task_id}）"
+    )
+    return {"ok": True, "task_id": task_id}
 
 
 @router.get("/pool")

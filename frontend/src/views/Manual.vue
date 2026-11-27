@@ -22,7 +22,7 @@
           </el-input>
           <el-select v-model="source" style="width: 150px">
             <el-option label="聚合搜索" value="" />
-            <el-option v-for="s in SOURCES" :key="s" :label="s" :value="s" />
+            <el-option v-for="s in UPSTREAM_SOURCES" :key="s.value" :label="s.label" :value="s.value" />
           </el-select>
           <el-button type="primary" :loading="searching" @click="search">搜索</el-button>
           <span class="spacer"></span>
@@ -126,10 +126,9 @@ import api from '../api'
 import StatusTag from '../components/StatusTag.vue'
 import TrackCover from '../components/TrackCover.vue'
 import { realtime } from '../stores/realtime'
-import { fmtTime } from '../utils/constants'
+import { fmtTime, UPSTREAM_SOURCES } from '../utils/constants'
 import { onRealtime } from '../utils/realtime'
 
-const SOURCES = ['netease', 'tencent', 'kugou', 'kuwo', 'migu', 'joox', 'spotify', 'apple']
 const keyword = ref('周杰伦 晴天')
 const source = ref('')
 const searching = ref(false)

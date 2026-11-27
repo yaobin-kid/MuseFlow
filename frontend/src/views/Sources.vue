@@ -140,6 +140,18 @@
                 <span class="dim mono" style="font-size:10.5px">{{ (row.weighted_total ?? 0) }} × {{ row.cross_multiplier ?? 1 }}</span>
               </template>
             </el-table-column>
+            <el-table-column label="操作" width="88" align="right">
+              <template #default="{ row }">
+                <el-button
+                  v-if="canDownload(row)"
+                  size="small"
+                  text
+                  type="primary"
+                  @click.stop="downloadNow(row)"
+                >下载</el-button>
+                <span v-else class="dim" style="font-size:11px">—</span>
+              </template>
+            </el-table-column>
           </el-table>
           <div v-else class="loading-block">
             {{ loading ? '加载中…' : selected ? '暂无曲目，点击「立即采集」抓取榜单数据' : '请选择左侧歌单' }}
@@ -254,6 +266,23 @@ function scoreStyle(row) {
 
 function uniquePlatforms(row) {
   return [...new Set((row.sources || []).map((s) => s.platform))]
+}
+
+const ACTIVE_STATUSES = ['QUEUED_DOWNLOAD', 'WAITING', 'DOWNLOADING', 'PROCESSING', 'COMPLETED', 'SKIPPED_EXISTS']
+
+function canDownload(row) {
+  if (row.downloaded_path) return false
+  return !ACTIVE_STATUSES.includes(row.status)
+}
+
+async function downloadNow(row) {
+  try {
+    const { data } = await api.post(`/sources/tracks/${row.id}/download`)
+    row.status = 'QUEUED_DOWNLOAD'
+    ElMessage.success(`已加入下载队列：${row.title}（任务 #${data.task_id}）`)
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '加入下载队列失败')
+  }
 }
 
 function isCooling(platform) {

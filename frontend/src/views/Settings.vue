@@ -336,15 +336,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '../api'
 import PlatformBadge from '../components/PlatformBadge.vue'
 import { realtime } from '../stores/realtime'
-import { PLATFORM_META, fmtTime } from '../utils/constants'
-
-const UPSTREAM_SOURCES = [
-  { value: 'netease', label: 'netease（网易云 1）' },
-  { value: 'netease2', label: 'netease2（网易云 2）' },
-  { value: 'bilibili', label: 'bilibili（B 站）' },
-  { value: 'joox', label: 'joox（JOOX）' },
-  { value: 'kuwo', label: 'kuwo（酷我）' }
-]
+import { PLATFORM_META, UPSTREAM_SOURCES, fmtTime } from '../utils/constants'
 
 const config = ref(null)
 const system = ref({})

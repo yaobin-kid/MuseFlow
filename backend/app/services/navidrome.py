@@ -6,6 +6,7 @@ import hashlib
 import random
 import string
 from typing import Optional
+from urllib.parse import urlencode
 
 import httpx
 
@@ -371,8 +372,13 @@ class NavidromeService:
         if nav_id:
             payload.append(("playlistId", nav_id))
         try:
+            body = urlencode(payload).encode("utf-8")
             async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(self._url(cfg, "createPlaylist"), data=payload)
+                resp = await client.post(
+                    self._url(cfg, "createPlaylist"),
+                    content=body,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
                 data = resp.json().get("subsonic-response", {})
                 if data.get("status") != "ok":
                     if nav_id:

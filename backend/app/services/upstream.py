@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import urllib.parse
 from typing import Optional
 
@@ -89,8 +90,26 @@ class UpstreamService:
             filename = (meta or {}).get("filename") or ""
             path = None
             if filename:
-                path = await self._try_fetch_file(client, filename, temp_dir)
+                path = self._copy_local(filename, temp_dir) or await self._try_fetch_file(
+                    client, filename, temp_dir
+                )
             return meta if isinstance(meta, dict) else {"raw": meta}, path
+
+    def _copy_local(self, filename: str, temp_dir: str) -> Optional[str]:
+        """内置上游（同容器）直接读取其下载目录，避免依赖 /music 的 HTTP 路由。"""
+        base = (self.cfg.local_download_dir or "").strip()
+        if not base or not filename:
+            return None
+        source = os.path.join(base, os.path.basename(filename))
+        if not os.path.isfile(source):
+            return None
+        try:
+            os.makedirs(temp_dir, exist_ok=True)
+            target = os.path.join(temp_dir, sanitize_filename(filename))
+            shutil.copyfile(source, target)
+            return target
+        except Exception:  # noqa: BLE001
+            return None
 
     async def _try_fetch_file(self, client: httpx.AsyncClient, filename: str, temp_dir: str) -> Optional[str]:
         url = self.cfg.file_path_template.format(filename=urllib.parse.quote(filename))
@@ -123,7 +142,9 @@ class UpstreamService:
                 data = resp.json()
                 filename = (data or {}).get("filename") or ""
                 if filename:
-                    path = await self._try_fetch_file(client, filename, temp_dir)
+                    path = self._copy_local(filename, temp_dir) or await self._try_fetch_file(
+                        client, filename, temp_dir
+                    )
                     if path:
                         return path
         except Exception as exc:  # noqa: BLE001

@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     upstream_source_order: str = "netease,tencent,kugou,kuwo,migu,joox,spotify,apple"
     upstream_cover_path: str = "/api/pic"
     upstream_lyric_path: str = "/api/lyric"
+    upstream_local_download_dir: str = ""
 
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
@@ -180,6 +181,7 @@ class UpstreamConfig(BaseModel):
     preferred_bitrate: str = "999"
     cover_path: str = "/api/pic"
     lyric_path: str = "/api/lyric"
+    local_download_dir: str = ""
     source_order: List[str] = Field(default_factory=lambda: ["netease", "tencent", "kugou", "kuwo", "migu"])
 
 
@@ -265,6 +267,7 @@ def build_default_runtime_config(s: Settings = settings) -> RuntimeConfig:
     cfg.upstream.file_path_template = s.upstream_file_path_template
     cfg.upstream.cover_path = s.upstream_cover_path
     cfg.upstream.lyric_path = s.upstream_lyric_path
+    cfg.upstream.local_download_dir = s.upstream_local_download_dir
     cfg.upstream.source_order = _csv(s.upstream_source_order)
     return cfg
 

@@ -214,13 +214,27 @@ async def load_runtime_config() -> RuntimeConfig:
     row = await fetchone("SELECT value FROM settings WHERE key = 'runtime_config'")
     if row:
         try:
-            _runtime_config = RuntimeConfig.model_validate(json.loads(row["value"]))
-            return _runtime_config
+            cfg = RuntimeConfig.model_validate(json.loads(row["value"]))
+            if _needs_upstream_migration(cfg):
+                # 内置上游上线后，把从未改过的旧默认地址迁移到容器内上游
+                cfg.upstream.base_url = settings.upstream_base_url
+                cfg.upstream.local_download_dir = settings.upstream_local_download_dir
+                await save_runtime_config(cfg)
+            _runtime_config = cfg
+            return cfg
         except Exception:
             pass
     _runtime_config = build_default_runtime_config()
     await save_runtime_config(_runtime_config)
     return _runtime_config
+
+
+def _needs_upstream_migration(cfg: RuntimeConfig) -> bool:
+    return bool(
+        settings.upstream_local_download_dir
+        and cfg.upstream.base_url.rstrip("/") == "https://music.gdstudio.xyz"
+        and not cfg.upstream.local_download_dir
+    )
 
 
 def get_runtime_config() -> RuntimeConfig:

@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.db
 data/
+library/
 node_modules/
 frontend/dist/
 backend/app/static/

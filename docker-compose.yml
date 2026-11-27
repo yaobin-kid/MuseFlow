@@ -10,14 +10,23 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+      # 如需直接访问内置上游 Web 界面，取消下一行注释
+      # - "8080:8080"
     env_file:
       - .env
     environment:
       TZ: Asia/Shanghai
       DATA_DIR: /data
       TEMP_DOWNLOAD_DIR: /data/downloads/temp
-      FINAL_MUSIC_DIR: /music
+      # MuseFlow 最终音乐库（不要让 Navidrome 扫描 /music）
+      FINAL_MUSIC_DIR: /library
+      # 内置上游服务，仅供容器内部访问
+      RUN_UPSTREAM: "true"
+      UPSTREAM_PORT: "8080"
     volumes:
+      # 数据库、日志、临时文件
       - ./data:/data
-      # 将左侧修改为 NAS 上的实际音乐目录
+      # 上游服务的下载目录（固定为 /music）：MuseFlow 只读读取，不写入
       - ./music:/music
+      # MuseFlow 整理后的音乐库，供 Navidrome 扫描
+      - ./library:/library

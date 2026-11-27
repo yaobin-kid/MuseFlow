@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Optional
+from urllib.parse import unquote, urlsplit
 
 import httpx
 
@@ -54,7 +55,7 @@ class PlatformHttp:
                 async with await self._client() as client:
                     resp = await client.get(url, params=params, headers=headers or {})
                     if resp.status_code in (403, 429, 503):
-                        text = await self._try_flaresolverr(url)
+                        text = await self._try_flaresolverr(url, params)
                         if text:
                             return _maybe_json(text)
                         resp.raise_for_status()
@@ -63,7 +64,7 @@ class PlatformHttp:
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 if attempt == 0 and self.network.flaresolverr_enabled:
-                    text = await self._try_flaresolverr(url)
+                    text = await self._try_flaresolverr(url, params)
                     if text:
                         return _maybe_json(text)
                 await asyncio.sleep(1.5)
@@ -75,20 +76,40 @@ class PlatformHttp:
             resp.raise_for_status()
             return resp.text
 
-    async def _try_flaresolverr(self, url: str) -> Optional[str]:
+    def _flare_proxy(self) -> Optional[dict]:
+        """把平台代理转换为 FlareSolverr 的 proxy 参数（用户名/密码单独拆分）。"""
+        proxy = self._proxy()
+        if not proxy:
+            return None
+        parsed = urlsplit(proxy)
+        host = parsed.hostname or ""
+        if not host:
+            return {"url": proxy}
+        netloc = host + (f":{parsed.port}" if parsed.port else "")
+        payload: dict = {"url": f"{parsed.scheme}://{netloc}" if parsed.scheme else proxy}
+        if parsed.username:
+            payload["username"] = unquote(parsed.username)
+        if parsed.password:
+            payload["password"] = unquote(parsed.password)
+        return payload
+
+    async def _try_flaresolverr(self, url: str, params: dict | None = None) -> Optional[str]:
         if not self.network.flaresolverr_enabled or not self.network.flaresolverr_url:
             return None
-        await hub.log("INFO", self.platform, f"触发 FlareSolverr 过盾：{url}")
+        target = str(httpx.URL(url, params=params)) if params else url
+        proxy = self._flare_proxy()
+        display = f"{target}（代理：{proxy['url']}）" if proxy else target
+        await hub.log("INFO", self.platform, f"触发 FlareSolverr 过盾：{display}")
         try:
             async with httpx.AsyncClient(timeout=self.network.flaresolverr_timeout_sec + 15) as client:
-                resp = await client.post(
-                    self.network.flaresolverr_url,
-                    json={
-                        "cmd": "request.get",
-                        "url": url,
-                        "maxTimeout": self.network.flaresolverr_timeout_sec * 1000,
-                    },
-                )
+                payload: dict = {
+                    "cmd": "request.get",
+                    "url": target,
+                    "maxTimeout": self.network.flaresolverr_timeout_sec * 1000,
+                }
+                if proxy:
+                    payload["proxy"] = proxy
+                resp = await client.post(self.network.flaresolverr_url, json=payload)
                 data = resp.json()
                 return (data.get("solution") or {}).get("response")
         except Exception as exc:  # noqa: BLE001

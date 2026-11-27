@@ -24,6 +24,7 @@ MuseFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ
 - **实时看板**：配额仪表盘、抓取/去重/入库漏斗、跨平台重合度、音质分布、任务趋势、实时日志（WebSocket）
 - **Webhook 通知**：通用 JSON / Telegram / Bark / 企业微信 / 钉钉 / Discord
 - **演示模式**：`DEMO_MODE=true` 时首次启动自动生成示例数据，无网络也能完整体验界面
+- **内置上游服务**：Docker 镜像基于 `ghcr.io/juneix/nas-music-kit`，同一容器内自动启动上游搜索/下载/歌词/封面 API（8080 内部端口），开箱即用
 
 ---
 
@@ -33,23 +34,23 @@ MuseFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ
 | --- | --- |
 | 后端 | Python 3.11+ · FastAPI · APScheduler · SQLite（aiosqlite） |
 | 前端 | Vue 3 · Vite · Element Plus · ECharts |
-| 部署 | 单容器，前端构建产物由 FastAPI 托管在 `/` |
+| 部署 | 单容器：MuseFlow + 内置上游服务，前端构建产物由 FastAPI 托管在 `/` |
 
 ```text
 ┌────────────────────────────┐
 │  Vue3 控制台（SPA）         │
 └─────────────┬──────────────┘
               │ /api  /ws
-┌─────────────▼──────────────┐
-│ FastAPI                    │
-│  ├─ 采集器（4 平台）        │
-│  ├─ 打分引擎                │
-│  ├─ 下载队列 + 限流         │
+┌─────────────▼──────────────┐        ┌───────────────────────────┐
+│ FastAPI (8000)             │──────► │ 内置上游服务 (8080)        │
+│  ├─ 采集器（4 平台）        │ HTTP   │ 搜索/下载/歌词/封面        │
+│  ├─ 打分引擎                │        │ 文件下载到 /music（只读）  │
+│  ├─ 下载队列 + 限流         │        └───────────────────────────┘
 │  ├─ 后处理（标签/封面/歌词）│
 │  └─ Navidrome Subsonic 客户端│
 └──────┬──────────────┬──────┘
        │              │
-  SQLite /data    音乐库 /music ──► Navidrome
+  SQLite /data    音乐库 /library ──► Navidrome
 ```
 
 ---
@@ -122,7 +123,61 @@ cd ..\backend
 
 ## Docker Compose 配置
 
-[docker-compose.yml](docker-compose.yml) 默认内容：
+仓库根目录的 [docker-compose.yml](docker-compose.yml) 是**完整可直接运行**的版本，复制到 NAS 后无需额外查找配置：
+
+```yaml
+services:
+  museflow:
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: https://registry.npmmirror.com
+        PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+    image: museflow:latest
+    container_name: museflow
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      # 需要直接访问内置上游 Web 界面时，取消下一行注释
+      # - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      DATA_DIR: /data
+      TEMP_DOWNLOAD_DIR: /data/downloads/temp
+      FINAL_MUSIC_DIR: /library
+      RUN_UPSTREAM: "true"
+      UPSTREAM_PORT: "8080"
+    volumes:
+      # 数据库、日志、临时文件
+      - ./data:/data
+      # 上游服务固定下载目录：MuseFlow 只读读取，不写入
+      - ./music:/music
+      # MuseFlow 整理后的音乐库，供 Navidrome 扫描
+      - ./library:/library
+```
+
+### 目录约定（重要）
+
+| 容器路径 | 宿主机路径 | 归属 | 说明 |
+| --- | --- | --- | --- |
+| `/music` | `./music` | 上游服务专用 | 上游固定下载目录，MuseFlow **只读**读取，绝不写入 |
+| `/library` | `./library` | MuseFlow | 最终音乐库（按歌手/专辑归档），Navidrome 只扫描这里 |
+| `/data` | `./data` | MuseFlow | SQLite 数据库、日志、临时下载文件 |
+
+| 配置项 | 说明 |
+| --- | --- |
+| `build.args.NPM_REGISTRY` / `PIP_INDEX_URL` | 前端 / Python 依赖镜像源，国内网络建议保留 |
+| `ports` | 左侧为宿主机端口，可改为 `"8080:8000"` 等 |
+| `FINAL_MUSIC_DIR=/library` | 必须与 `./library:/library` 挂载一致 |
+| `RUN_UPSTREAM` / `UPSTREAM_PORT` | 内置上游开关与内部端口（默认 8080，仅容器内） |
+| `./music:/music` | 改为 NAS 实际路径，例如 `/volume1/upstream-music:/music` |
+| `./library:/library` | 改为 NAS 实际路径，例如 `/volume1/museflow-library:/library` |
+
+### 完整版：MuseFlow + Navidrome 一起部署
+
+同一台 NAS 上直接使用下面的完整文件即可（Navidrome 只挂载 `/library` 只读扫描）：
 
 ```yaml
 services:
@@ -143,51 +198,82 @@ services:
       TZ: Asia/Shanghai
       DATA_DIR: /data
       TEMP_DOWNLOAD_DIR: /data/downloads/temp
-      FINAL_MUSIC_DIR: /music
+      FINAL_MUSIC_DIR: /library
+      RUN_UPSTREAM: "true"
+      UPSTREAM_PORT: "8080"
     volumes:
       - ./data:/data
-      # 将左侧修改为 NAS 上的实际音乐目录
       - ./music:/music
-```
+      - ./library:/library
 
-| 配置项 | 说明 |
-| --- | --- |
-| `build.args.NPM_REGISTRY` | 前端依赖镜像源，国内网络建议保留 |
-| `build.args.PIP_INDEX_URL` | Python 依赖镜像源 |
-| `ports` | 左侧为宿主机端口，按需改为 `8080:8000` 等 |
-| `env_file` | 读取 `.env` 中的全部环境变量 |
-| `DATA_DIR=/data` | SQLite 数据库、日志、临时下载文件目录（必须持久化） |
-| `FINAL_MUSIC_DIR=/music` | 最终音乐库目录，需与音量挂载一致，并让 Navidrome 扫描同一目录 |
-| `./data:/data` | 数据持久化挂载 |
-| `./music:/music` | 音乐库挂载，改为 NAS 实际路径，例如 `/volume1/music:/music` |
-
-**与 Navidrome 联动示例**（同一台 NAS）：
-
-```yaml
-services:
   navidrome:
     image: deluan/navidrome:latest
+    container_name: navidrome
     restart: unless-stopped
     ports:
       - "4533:4533"
     environment:
-      ND_MUSICFOLDER: /music
+      TZ: Asia/Shanghai
+      ND_MUSICFOLDER: /library
+      ND_SCANSCHEDULE: 1h
     volumes:
-      - /volume1/music:/music
+      - ./library:/library:ro
       - ./navidrome-data:/data
 ```
 
-此时 MuseFlow 的 `.env` 中填写：
+配套 `.env`（可直接复制，按注释修改密码即可）：
 
 ```ini
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+SECRET_KEY=change-me-to-a-long-random-string
+
+DEMO_MODE=true
+TZ=Asia/Shanghai
+
+# 内置上游（保持默认即可）
+RUN_UPSTREAM=true
+UPSTREAM_PORT=8080
+UPSTREAM_BASE_URL=http://127.0.0.1:8080
+UPSTREAM_LOCAL_DOWNLOAD_DIR=/music
+UPSTREAM_BITRATE=999
+UPSTREAM_SOURCE_ORDER=netease,tencent,kugou,kuwo,migu,joox,spotify,apple
+UPSTREAM_COVER_PATH=/api/pic
+UPSTREAM_LYRIC_PATH=/api/lyric
+
+# 目录（与 compose 挂载保持一致，无需修改）
+DATA_DIR=/data
+TEMP_DOWNLOAD_DIR=/data/downloads/temp
+FINAL_MUSIC_DIR=/library
+
+# 打分（默认权重偏向 Spotify / Apple 英文热门）
+MIN_DOWNLOAD_SCORE=75
+WEIGHT_NETEASE=0.15
+WEIGHT_QQ=0.15
+WEIGHT_SPOTIFY=0.35
+WEIGHT_APPLE=0.35
+BLACKLIST_KEYWORDS=DJ,喊麦,伴奏,铃声,串烧
+
+# Navidrome（修改为你的密码）
 NAVIDROME_ENABLED=true
 NAVIDROME_URL=http://navidrome:4533
 NAVIDROME_USERNAME=admin
 NAVIDROME_PASSWORD=你的Navidrome密码
+NAVIDROME_MATCH_MODE=strict
+NAVIDROME_AUTO_SCAN=true
 NAVIDROME_SYNC_PLAYLISTS=true
+NAVIDROME_SYNC_INTERVAL_MINUTES=60
+
+# 定时任务
+SCHEDULER_ENABLED=true
+COLLECT_INTERVAL_MINUTES=360
 ```
 
-> 两个容器需在同一 Docker 网络内（同一 compose 文件默认即可），`NAVIDROME_URL` 才可使用容器名访问。若 Navidrome 部署在别处，改为其可访问的地址与端口。
+> **内置上游说明**：镜像基于 `ghcr.io/juneix/nas-music-kit:latest`，容器启动时会先在内部 `8080` 启动上游服务（`/api/search`、`/api/download`、`/api/lyric`、`/api/cover`），再启动 MuseFlow。默认 `UPSTREAM_BASE_URL=http://127.0.0.1:8080`，无需额外部署上游容器；如需使用外部上游，设置 `RUN_UPSTREAM=false`、清空 `UPSTREAM_LOCAL_DOWNLOAD_DIR` 并修改 `UPSTREAM_BASE_URL`。
+>
+> **目录不要混用**：`/music` 是上游固定下载目录（不要修改，也不要让 Navidrome 扫描）；MuseFlow 会把整理后的文件复制到 `/library`，Navidrome 只扫描 `/library`。
+>
+> `NAVIDROME_URL` 使用容器名，两个服务需在同一 Docker 网络（同一 compose 文件默认满足）；Navidrome 部署在别处时改成实际地址。
 
 ---
 
@@ -216,13 +302,21 @@ NAVIDROME_SYNC_PLAYLISTS=true
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `UPSTREAM_BASE_URL` | `https://music.gdstudio.xyz` | 上游搜索/下载服务地址 |
+| `UPSTREAM_BASE_URL` | `http://127.0.0.1:8080`（镜像内） | 上游搜索/下载服务地址，指向外部上游时改为其地址 |
 | `UPSTREAM_TIMEOUT_SEC` | `60` | 上游请求超时（秒） |
 | `UPSTREAM_BITRATE` | `999` | 期望码率（`999` 表示尽量取最高/Hi-Res） |
 | `UPSTREAM_SOURCE_ORDER` | `netease,tencent,kugou,kuwo,migu,joox,spotify,apple` | 上游音源优先级 |
-| `UPSTREAM_FILE_PATH_TEMPLATE` | `/music/{filename}` | 上游返回 JSON 文件名时，按此模板拼接音频地址 |
+| `UPSTREAM_FILE_PATH_TEMPLATE` | `/music/{filename}` | 外部上游返回 JSON 文件名时，按此模板拼接音频地址 |
+| `UPSTREAM_LOCAL_DOWNLOAD_DIR` | `/music`（镜像内） | 内置上游下载目录（只读），MuseFlow 从这里复制文件；留空则走 HTTP 下载 |
 | `UPSTREAM_COVER_PATH` | `/api/pic` | 上游「歌曲封面图片数据」接口路径（参数 `source`、`id`） |
 | `UPSTREAM_LYRIC_PATH` | `/api/lyric` | 上游「仅歌词下载」接口路径 |
+
+### 内置上游进程（仅 Docker 镜像）
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `RUN_UPSTREAM` | `true` | 是否在容器内启动内置上游服务；使用外部上游时设为 `false` |
+| `UPSTREAM_PORT` | `8080` | 内置上游监听端口（仅容器内部，默认不对宿主机暴露） |
 
 ### 网络与防风控
 
@@ -272,8 +366,8 @@ NAVIDROME_SYNC_PLAYLISTS=true
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `TEMP_DOWNLOAD_DIR` | `./data/downloads/temp` | 临时下载目录 |
-| `FINAL_MUSIC_DIR` | `./data/music_library` | 最终音乐库目录（Navidrome 需扫描同一目录） |
+| `TEMP_DOWNLOAD_DIR` | `/data/downloads/temp`（镜像内） | 临时下载目录 |
+| `FINAL_MUSIC_DIR` | `/library`（镜像内） | MuseFlow 最终音乐库，Navidrome 只扫描该目录 |
 
 ### Webhook 通知
 
@@ -361,7 +455,8 @@ MuseFlow 内置 `/api/cover` 代理封面接口，供浏览器 `<img>` 直接引
 data/
 ├─ museflow.db              # SQLite：配置、榜单、曲目、任务、日志、索引缓存
 └─ downloads/temp/          # 临时下载文件
-music_library/             # 最终音乐库（按 歌手/专辑/歌曲 归档）
+library/                   # 最终音乐库（按 歌手/专辑/歌曲 归档，Navidrome 扫描此目录）
+music/                     # 上游服务的下载目录（只读，MuseFlow 不写入）
 backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 ```
 
@@ -388,6 +483,12 @@ backend/app/static/        # 前端构建产物（由 FastAPI 托管）
 
 **Q：修改了 `.env` 但没生效？**
 控制台「系统设置」中的数据库配置优先级更高，「恢复环境变量默认值」后重启，或重新部署。
+
+**Q：镜像里为什么同时有两个服务？**
+运行时镜像基于 `ghcr.io/juneix/nas-music-kit`，容器入口会先在内部 `8080` 启动上游搜索下载服务，再在 `8000` 启动 MuseFlow。宿主机只需映射 `8000`；如需直接访问上游 Web 界面，可额外映射 `"8080:8080"`。
+
+**Q：升级镜像后没有使用内置上游？**
+若数据库中的上游地址仍是旧默认值 `https://music.gdstudio.xyz` 且未自定义，启动时会自动迁移到 `http://127.0.0.1:8080`。如果你手动改过配置，请在「系统设置 → 路径与上游服务」中改为 `http://127.0.0.1:8080`，或点击「恢复环境变量默认值」后重启。
 
 **Q：端口被占用？**
 修改 `docker-compose.yml` 的 `ports`，例如 `"8080:8000"`。

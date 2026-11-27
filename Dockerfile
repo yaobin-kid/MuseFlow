@@ -7,8 +7,8 @@ RUN npm ci --registry=${NPM_REGISTRY}
 COPY frontend/ ./
 RUN npm run build
 
-# ---------- 运行时 ----------
-FROM python:3.12-slim
+# ---------- 运行时（基础镜像内置上游搜索下载服务） ----------
+FROM ghcr.io/juneix/nas-music-kit:latest
 
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 ENV PYTHONUNBUFFERED=1 \
@@ -19,19 +19,29 @@ ENV PYTHONUNBUFFERED=1 \
     HOST=0.0.0.0 \
     PORT=8000 \
     TEMP_DOWNLOAD_DIR=/data/downloads/temp \
-    FINAL_MUSIC_DIR=/data/music_library
+    FINAL_MUSIC_DIR=/library \
+    RUN_UPSTREAM=true \
+    UPSTREAM_PORT=8080 \
+    UPSTREAM_BASE_URL=http://127.0.0.1:8080 \
+    UPSTREAM_LOCAL_DOWNLOAD_DIR=/music
 
-WORKDIR /app
+# MuseFlow 放在独立目录，避免与上游 /app/app.py 的模块名 app 冲突
+WORKDIR /opt/museflow
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install -i ${PIP_INDEX_URL} -r requirements.txt
 
 COPY backend/app ./app
 COPY --from=frontend /app/backend/app/static ./app/static
+COPY docker-entrypoint.sh /usr/local/bin/museflow-entrypoint.sh
 
-RUN mkdir -p /data/downloads/temp /data/music_library
+# /music 归上游服务专用（只读读取），MuseFlow 的最终音乐库在 /library
+RUN chmod +x /usr/local/bin/museflow-entrypoint.sh \
+    && mkdir -p /data/downloads/temp /library /music
 
-EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# 8000：MuseFlow 控制台；8080：内置上游搜索下载服务
+EXPOSE 8000 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"
 
+ENTRYPOINT ["/usr/local/bin/museflow-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

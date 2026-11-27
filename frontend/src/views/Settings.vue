@@ -59,6 +59,22 @@
             <el-form-item label="FlareSolverr 超时（秒）">
               <el-input-number v-model="config.network.flaresolverr_timeout_sec" :min="5" :max="300" style="width: 100%" />
             </el-form-item>
+            <el-form-item label="FlareSolverr 连通性测试">
+              <div style="display: flex; gap: 8px; width: 100%">
+                <el-input v-model="flareTestUrl" placeholder="https://www.google.com/generate_204" />
+                <el-button :loading="testingFlare" style="flex: 0 0 auto" @click="testFlare">测试过盾</el-button>
+              </div>
+              <div class="dim" style="font-size:11.5px; margin-top: 6px">
+                使用已保存的地址与开关；测试请求不携带代理，仅验证 FlareSolverr 服务本身是否正常
+              </div>
+              <div
+                v-if="flareResult"
+                style="font-size: 12px; margin-top: 6px; width: 100%"
+                :style="flareResult.ok ? 'color:#16a34a' : 'color:#dc2626'"
+              >
+                {{ flareResult.text }}
+              </div>
+            </el-form-item>
             <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px">
               <template #title>代理与 FlareSolverr 的协作规则</template>
               <div style="font-size: 12px; line-height: 1.9">
@@ -160,7 +176,7 @@
             <el-form-item label="同步生成 Navidrome 歌单">
               <el-switch v-model="config.navidrome.sync_playlists" />
               <span class="dim" style="font-size:11.5px;margin-left:10px">
-                采集与下载完成后自动创建/刷新同名歌单，仅保留最新榜单曲目
+                采集与下载完成后，按平台创建/刷新一个歌单（合并该平台所有榜单并去重），仅保留最新曲目
               </span>
             </el-form-item>
             <div class="grid-2" style="gap: 12px">
@@ -330,6 +346,9 @@ const testingUpstream = ref(false)
 const proxyTestUrl = ref('https://www.google.com/generate_204')
 const testingProxy = ref(false)
 const proxyResult = ref(null)
+const flareTestUrl = ref('https://www.google.com/generate_204')
+const testingFlare = ref(false)
+const flareResult = ref(null)
 
 function platformName(key) {
   return PLATFORM_META[key]?.name || key
@@ -424,6 +443,25 @@ async function testUpstream() {
     ElMessage.error(error.response?.data?.detail || '上游连接失败')
   } finally {
     testingUpstream.value = false
+  }
+}
+
+async function testFlare() {
+  testingFlare.value = true
+  flareResult.value = null
+  try {
+    const { data } = await api.post('/settings/test-flaresolverr', { url: flareTestUrl.value })
+    flareResult.value = {
+      ok: true,
+      text: `FlareSolverr 正常：目标 HTTP ${data.status_code}，耗时 ${data.elapsed_ms} ms，返回 ${data.response_bytes} 字节${data.version ? `（${data.version}）` : ''}`,
+    }
+    ElMessage.success('FlareSolverr 正常')
+  } catch (error) {
+    const detail = error.response?.data?.detail || error.message || 'FlareSolverr 测试失败'
+    flareResult.value = { ok: false, text: detail }
+    ElMessage.error(detail)
+  } finally {
+    testingFlare.value = false
   }
 }
 

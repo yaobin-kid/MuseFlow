@@ -20,7 +20,7 @@ MuseFlow 是一套自托管的音乐自动化控制台：从网易云音乐、QQ
 - **下载队列**：优先级队列、滑动窗口限流、失败重试/取消、进度与后处理状态实时推送
 - **下载后处理**：自动写入标签、拉取仅歌词 API 保存 `.lrc`、拉取封面 API 并嵌入音频与专辑目录
 - **Navidrome 去重**：Subsonic API 曲库索引同步，严格 / 宽松两种匹配模式，入库后触发扫库
-- **Navidrome 歌单自动生成**：索引同步成功后，按已调度榜单创建/刷新同名歌单，每次更新只保留最新榜单曲目，新歌下载完成并扫库后自动刷新
+- **Navidrome 歌单自动生成**：按平台各生成一个歌单（合并该平台所有榜单并去重），每次更新只保留最新曲目，新歌下载完成并扫库后自动刷新
 - **实时看板**：配额仪表盘、抓取/去重/入库漏斗、跨平台重合度、音质分布、任务趋势、实时日志（WebSocket）
 - **Webhook 通知**：通用 JSON / Telegram / Bark / 企业微信 / 钉钉 / Discord
 - **演示模式**：`DEMO_MODE=true` 时首次启动自动生成示例数据，无网络也能完整体验界面
@@ -358,7 +358,7 @@ COLLECT_INTERVAL_MINUTES=360
 | `NAVIDROME_MATCH_MODE` | `strict` | 去重匹配：`strict`（歌手+歌名）/ `loose`（歌名优先） |
 | `NAVIDROME_AUTO_SCAN` | `true` | 入库后自动触发 Navidrome 扫库 |
 | `NAVIDROME_SYNC_PLAYLISTS` | `true` | 索引同步成功后自动创建/刷新 Navidrome 歌单 |
-| `NAVIDROME_PLAYLIST_PREFIX` | `MuseFlow` | 歌单名称前缀，最终名称形如 `MuseFlow · 网易云音乐 · 热歌榜` |
+| `NAVIDROME_PLAYLIST_PREFIX` | `MuseFlow` | 歌单名称前缀，最终名称形如 `MuseFlow · 网易云音乐`（一个平台一个歌单） |
 | `NAVIDROME_PLAYLIST_REFRESH_DELAY_SEC` | `30` | 下载完成后等待扫库完成再刷新歌单的延迟（秒） |
 | `NAVIDROME_SYNC_INTERVAL_MINUTES` | `60` | 曲库索引 + 歌单定时刷新间隔 |
 
@@ -408,7 +408,7 @@ COLLECT_INTERVAL_MINUTES=360
    - 配置 Navidrome 连接，点击「测试连接」；
    - 点击「立即同步索引」可手动触发索引同步与歌单刷新；
    - 点击「刷新歌单」仅重建 Navidrome 歌单。
-7. **Navidrome 客户端**：在歌单页即可看到 `MuseFlow · 平台 · 榜单名` 的歌单，曲目始终保持最新。
+7. **Navidrome 客户端**：在歌单页即可看到 `MuseFlow · 平台名` 的 4 个歌单，各平台所有榜单已合并去重，曲目始终保持最新。
 
 ---
 
@@ -425,12 +425,13 @@ COLLECT_INTERVAL_MINUTES=360
 
 实现细节：
 
-- 歌单名称：`{NAVIDROME_PLAYLIST_PREFIX} · {平台中文名} · {榜单名}`，例如 `MuseFlow · 网易云音乐 · 热歌榜`；
-- 每个已勾选榜单对应一个 Navidrome 歌单，仅包含**本次榜单**的曲目（重新采集会清空旧列表，只保留最新排名曲目）；
+- 歌单名称：`{NAVIDROME_PLAYLIST_PREFIX} · {平台中文名}`，例如 `MuseFlow · 网易云音乐`；
+- **一个平台只生成一个 Navidrome 歌单**：合并该平台所有已勾选榜单的曲目并按 `track_key` 去重，按各榜单中的最好名次排序；4 个平台最终只有 4 个歌单；
+- 每次刷新会清空旧列表并写入当前最新曲目（未下载或曲库中不存在的曲目自动跳过），因此歌单只包含真正可播放的歌曲；
 - 曲目通过 Subsonic `search3` 按「歌名 + 主歌手」匹配本地曲库中的 song id，匹配成功后写入索引缓存；
 - 使用 Subsonic `createPlaylist`（带 `playlistId`）覆盖更新，实现「始终最新」；
-- 本地 `navidrome_playlists` 表记录本地榜单与 Navidrome 歌单 id 的映射；若远端歌单被删除，会自动重建；
-- 尚未下载或曲库中不存在的曲目会被自动跳过，因此歌单只包含真正可播放的歌曲。
+- 本地 `navidrome_platform_playlists` 表记录平台与 Navidrome 歌单 id 的映射；若远端歌单被删除，会自动重建；
+- 升级后首次同步会自动删除旧版本按单个榜单创建的歌单，避免 Navidrome 中堆积重复歌单。
 
 前端「系统设置 → Navidrome」中可查看已同步歌单数与曲目数，并手动触发刷新。
 

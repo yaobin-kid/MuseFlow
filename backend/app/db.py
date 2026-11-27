@@ -118,6 +118,14 @@ CREATE TABLE IF NOT EXISTS navidrome_playlists (
     updated_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS navidrome_platform_playlists (
+    platform TEXT PRIMARY KEY,
+    navidrome_id TEXT DEFAULT '',
+    name TEXT DEFAULT '',
+    track_count INTEGER DEFAULT 0,
+    updated_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS job_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     trigger TEXT DEFAULT 'scheduler',

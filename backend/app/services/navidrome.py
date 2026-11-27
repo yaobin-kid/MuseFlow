@@ -194,13 +194,14 @@ class NavidromeService:
 
     # ---------------------------------------------------------------- 歌单同步
     @staticmethod
-    def _playlist_name(cfg: NavidromeConfig, playlist: dict) -> str:
-        label = _PLATFORM_LABELS.get(playlist["platform"], playlist["platform"])
-        parts = [p for p in ((cfg.playlist_prefix or "").strip(), label, playlist["name"]) if p]
-        return " · ".join(parts)
+    def _platform_playlist_name(cfg: NavidromeConfig, platform: str) -> str:
+        """每个平台只生成一个歌单：前缀 · 平台名。"""
+        label = _PLATFORM_LABELS.get(platform, platform)
+        prefix = (cfg.playlist_prefix or "").strip()
+        return f"{prefix} · {label}" if prefix else label
 
     async def refresh_playlists(self, cfg: NavidromeConfig, resolve_missing: bool = True) -> dict:
-        """按当前已调度歌单在 Navidrome 中创建/刷新同名歌单，仅保留最新榜单曲目。"""
+        """按平台在 Navidrome 中创建/刷新歌单：合并该平台所有榜单并去重。"""
         if not cfg.enabled or not cfg.url or not cfg.sync_playlists:
             return {"playlists": 0, "tracks": 0}
         if self._refreshing:
@@ -216,17 +217,29 @@ class NavidromeService:
             if resolve_missing:
                 await self._resolve_missing_ids(cfg, playlists, song_by_key)
 
+            grouped: dict[str, list[dict]] = {}
+            for pl in playlists:
+                grouped.setdefault(pl["platform"], []).append(pl)
+
             name_map = await self._navidrome_playlist_names(cfg)
-            mappings = {row["local_playlist_id"]: row for row in await fetchall("SELECT * FROM navidrome_playlists")}
+            mappings = {
+                row["platform"]: row
+                for row in await fetchall("SELECT * FROM navidrome_platform_playlists")
+            }
 
             synced_playlists = 0
             synced_tracks = 0
-            for pl in playlists:
+            for platform, items in grouped.items():
+                ids = [item["id"] for item in items]
+                marks = ",".join("?" for _ in ids)
                 tracks = await fetchall(
-                    """SELECT t.track_key FROM tracks t
-                       JOIN track_sources ts ON ts.track_id = t.id
-                       WHERE ts.playlist_id = ? ORDER BY ts.rank ASC""",
-                    (pl["id"],),
+                    f"""SELECT t.track_key, MIN(ts.rank) AS best_rank
+                        FROM tracks t
+                        JOIN track_sources ts ON ts.track_id = t.id
+                        WHERE ts.playlist_id IN ({marks})
+                        GROUP BY t.track_key
+                        ORDER BY best_rank ASC""",
+                    ids,
                 )
                 song_ids: list[str] = []
                 seen: set[str] = set()
@@ -238,30 +251,34 @@ class NavidromeService:
                 if not song_ids:
                     continue
 
-                name = self._playlist_name(cfg, pl)
-                mapping = mappings.get(pl["id"]) or {}
+                name = self._platform_playlist_name(cfg, platform)
+                mapping = mappings.get(platform) or {}
                 nav_id = mapping.get("navidrome_id") or name_map.get(name, "")
                 ok, result_id = await self._upsert_playlist(cfg, nav_id, name, song_ids)
                 if not ok:
                     continue
                 now = now_iso()
                 await execute(
-                    """INSERT INTO navidrome_playlists(local_playlist_id, navidrome_id, name, track_count, updated_at)
+                    """INSERT INTO navidrome_platform_playlists(platform, navidrome_id, name, track_count, updated_at)
                        VALUES(?, ?, ?, ?, ?)
-                       ON CONFLICT(local_playlist_id) DO UPDATE SET
+                       ON CONFLICT(platform) DO UPDATE SET
                          navidrome_id=excluded.navidrome_id, name=excluded.name,
                          track_count=excluded.track_count, updated_at=excluded.updated_at""",
-                    (pl["id"], result_id or nav_id, name, len(song_ids), now),
+                    (platform, result_id or nav_id, name, len(song_ids), now),
                 )
                 synced_playlists += 1
                 synced_tracks += len(song_ids)
+
+            if synced_playlists:
+                # 清理旧版本按单个榜单创建的歌单，避免 Navidrome 中堆积重复歌单
+                await self._cleanup_legacy_playlists(cfg)
 
             self.last_playlist_sync_at = now_iso()
             if synced_playlists:
                 await hub.log(
                     "INFO",
                     "navidrome",
-                    f"Navidrome 歌单同步完成：更新 {synced_playlists} 个歌单，共 {synced_tracks} 首曲目",
+                    f"Navidrome 歌单同步完成：{synced_playlists} 个平台歌单，共 {synced_tracks} 首曲目",
                 )
             return {"playlists": synced_playlists, "tracks": synced_tracks}
         except Exception as exc:  # noqa: BLE001
@@ -269,6 +286,36 @@ class NavidromeService:
             return {"playlists": 0, "tracks": 0, "error": str(exc)}
         finally:
             self._refreshing = False
+
+    async def _cleanup_legacy_playlists(self, cfg: NavidromeConfig) -> None:
+        """删除旧版本按单个榜单创建的 Navidrome 歌单。"""
+        rows = await fetchall("SELECT local_playlist_id, navidrome_id, name FROM navidrome_playlists")
+        if not rows:
+            return
+        removed = 0
+        for row in rows:
+            nav_id = row["navidrome_id"] or ""
+            if nav_id and not await self._delete_playlist(cfg, nav_id):
+                continue
+            await execute("DELETE FROM navidrome_playlists WHERE local_playlist_id = ?", (row["local_playlist_id"],))
+            if nav_id:
+                removed += 1
+        if removed:
+            await hub.log("INFO", "navidrome", f"已清理 {removed} 个旧版按榜单创建的歌单")
+
+    async def _delete_playlist(self, cfg: NavidromeConfig, nav_id: str) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                resp = await client.get(
+                    self._url(cfg, "deletePlaylist"), params={"id": nav_id, **self._auth(cfg)}
+                )
+                data = resp.json().get("subsonic-response", {})
+                if data.get("status") != "ok":
+                    await hub.log("WARN", "navidrome", f"旧歌单删除失败（可能已不存在）：{nav_id}")
+                return True
+        except Exception as exc:  # noqa: BLE001
+            await hub.log("WARN", "navidrome", f"旧歌单删除异常：{exc}")
+            return False
 
     async def _resolve_missing_ids(
         self, cfg: NavidromeConfig, playlists: list[dict], song_by_key: dict[str, str]

@@ -28,6 +28,21 @@ class ProxyTestPayload(BaseModel):
     url: str = DEFAULT_PROXY_TEST_URL
 
 
+class FlareTestPayload(BaseModel):
+    url: str = DEFAULT_PROXY_TEST_URL
+
+
+def _normalize_target(url: str | None) -> str:
+    target = (url or DEFAULT_PROXY_TEST_URL).strip() or DEFAULT_PROXY_TEST_URL
+    if len(target) > 2048:
+        raise HTTPException(status_code=400, detail="测试地址过长")
+    if not re.match(r"^https?://", target, re.IGNORECASE):
+        target = "https://" + target
+    if not urlsplit(target).hostname:
+        raise HTTPException(status_code=400, detail="测试地址无效，请填写完整网址")
+    return target
+
+
 def _mask_proxy(proxy: str) -> str:
     parsed = urlsplit(proxy)
     if parsed.username or parsed.password:
@@ -110,16 +125,7 @@ async def test_proxy(payload: ProxyTestPayload | None = None) -> dict:
     if not proxy:
         raise HTTPException(status_code=400, detail="未配置代理地址，请填写代理并保存后再测试")
 
-    target = ((payload.url if payload else "") or DEFAULT_PROXY_TEST_URL).strip()
-    if not target:
-        target = DEFAULT_PROXY_TEST_URL
-    if len(target) > 2048:
-        raise HTTPException(status_code=400, detail="测试地址过长")
-    if not re.match(r"^https?://", target, re.IGNORECASE):
-        target = "https://" + target
-    parsed = urlsplit(target)
-    if not parsed.hostname:
-        raise HTTPException(status_code=400, detail="测试地址无效，请填写完整网址")
+    target = _normalize_target(payload.url if payload else None)
 
     started = time.perf_counter()
     try:
@@ -144,6 +150,52 @@ async def test_proxy(payload: ProxyTestPayload | None = None) -> dict:
         "proxy": _mask_proxy(proxy),
         "status_code": resp.status_code,
         "elapsed_ms": elapsed,
+    }
+
+
+@router.post("/test-flaresolverr")
+async def test_flaresolverr(payload: FlareTestPayload | None = None) -> dict:
+    cfg = get_runtime_config()
+    if not cfg.network.flaresolverr_enabled:
+        raise HTTPException(status_code=400, detail="FlareSolverr 过盾未启用，请打开开关并保存后再测试")
+    endpoint = (cfg.network.flaresolverr_url or "").strip()
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="未配置 FlareSolverr 地址")
+
+    target = _normalize_target(payload.url if payload else None)
+    started = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=cfg.network.flaresolverr_timeout_sec + 20) as client:
+            resp = await client.post(
+                endpoint,
+                json={
+                    "cmd": "request.get",
+                    "url": target,
+                    "maxTimeout": cfg.network.flaresolverr_timeout_sec * 1000,
+                },
+            )
+            data = resp.json()
+        elapsed = int((time.perf_counter() - started) * 1000)
+    except Exception as exc:  # noqa: BLE001
+        await hub.log("WARN", "settings", f"FlareSolverr 测试失败：{exc}")
+        raise HTTPException(status_code=502, detail=f"FlareSolverr 调用失败：{exc}") from exc
+
+    solution = data.get("solution") or {}
+    if data.get("status") != "ok" or not solution:
+        message = data.get("message") or "FlareSolverr 未返回有效结果"
+        await hub.log("WARN", "settings", f"FlareSolverr 测试异常：{message}")
+        raise HTTPException(status_code=502, detail=f"FlareSolverr 异常：{message}")
+
+    await hub.log(
+        "INFO", "settings", f"FlareSolverr 测试成功：{target} → HTTP {solution.get('status')}（{elapsed}ms）"
+    )
+    return {
+        "ok": True,
+        "url": target,
+        "status_code": solution.get("status"),
+        "elapsed_ms": elapsed,
+        "response_bytes": len(solution.get("response") or ""),
+        "version": data.get("version") or "",
     }
 
 
@@ -180,7 +232,7 @@ async def sync_navidrome_playlists() -> dict:
 
 
 async def _playlist_summary() -> dict:
-    row = await fetchone("SELECT COUNT(*) AS cnt, SUM(track_count) AS tracks FROM navidrome_playlists")
+    row = await fetchone("SELECT COUNT(*) AS cnt, SUM(track_count) AS tracks FROM navidrome_platform_playlists")
     return {
         "count": (row or {}).get("cnt") or 0,
         "tracks": (row or {}).get("tracks") or 0,

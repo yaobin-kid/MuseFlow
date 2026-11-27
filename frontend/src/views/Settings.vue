@@ -23,6 +23,22 @@
             <el-form-item label="代理地址">
               <el-input v-model="config.network.proxy_url" placeholder="socks5://127.0.0.1:7890（留空表示直连）" />
             </el-form-item>
+            <el-form-item label="代理连通性测试">
+              <div style="display: flex; gap: 8px; width: 100%">
+                <el-input v-model="proxyTestUrl" placeholder="https://www.google.com/generate_204" />
+                <el-button :loading="testingProxy" style="flex: 0 0 auto" @click="testProxy">测试代理</el-button>
+              </div>
+              <div class="dim" style="font-size:11.5px; margin-top: 6px">
+                使用已保存的代理配置；默认访问 Google 204 接口，也可填写任意网址
+              </div>
+              <div
+                v-if="proxyResult"
+                style="font-size: 12px; margin-top: 6px; width: 100%"
+                :style="proxyResult.ok ? 'color:#16a34a' : 'color:#dc2626'"
+              >
+                {{ proxyResult.text }}
+              </div>
+            </el-form-item>
             <el-form-item label="按平台启用代理">
               <div class="grid-2" style="gap: 8px; width: 100%">
                 <div v-for="key in ['netease', 'qq', 'spotify', 'apple']" :key="key" class="bd-item" style="padding: 9px 12px">
@@ -43,6 +59,15 @@
             <el-form-item label="FlareSolverr 超时（秒）">
               <el-input-number v-model="config.network.flaresolverr_timeout_sec" :min="5" :max="300" style="width: 100%" />
             </el-form-item>
+            <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px">
+              <template #title>代理与 FlareSolverr 的协作规则</template>
+              <div style="font-size: 12px; line-height: 1.9">
+                <div>• <b>只走代理</b>：代理已填写 + 该平台「按平台启用代理」开启，且平台接口正常返回；过盾不会介入。</div>
+                <div>• <b>只走 FlareSolverr</b>：该平台代理开关关闭（或代理地址为空），但过盾开启且请求遇到 403 / 429 / 503 或异常。</div>
+                <div>• <b>两者同时使用</b>：代理、该平台开关、过盾都开启时，先用代理直连；被拦截后由 FlareSolverr 携带同一代理和原始查询参数重试。</div>
+                <div>• <b>代理作用范围</b>：仅网易云 / QQ / Spotify / Apple 的榜单采集；上游搜索下载、封面代理和 Navidrome 请求始终直连。过盾只接管平台 JSON 接口，普通请求不会经过它。</div>
+              </div>
+            </el-alert>
             <el-divider />
             <div class="grid-2" style="gap: 12px">
               <el-form-item label="同平台冷却基础时间（秒）">
@@ -166,17 +191,26 @@
         <div class="card-head">
           <div>
             <div class="card-title"><span class="dot"></span>路径与上游服务</div>
-            <div class="card-sub">临时下载目录、最终音乐库目录与上游 API 地址</div>
+            <div class="card-sub">整理暂存目录、最终音乐库目录与上游 API 地址</div>
           </div>
         </div>
         <div class="card-body">
           <el-form label-position="top">
-            <el-form-item label="临时下载目录">
+            <el-form-item label="整理暂存目录">
               <el-input v-model="config.paths.temp_download_dir" placeholder="/data/downloads/temp" />
             </el-form-item>
             <el-form-item label="最终音乐目录">
-              <el-input v-model="config.paths.final_music_dir" placeholder="/data/music_library" />
+              <el-input v-model="config.paths.final_music_dir" placeholder="/library" />
             </el-form-item>
+            <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px">
+              <template #title>三个目录的分工</template>
+              <div style="font-size: 12px; line-height: 1.9">
+                <div>• <b>上游下载目录 /music</b>：由上游服务固定写入，存放未整理的音频与歌词；MuseFlow 只读取，不写入。</div>
+                <div>• <b>整理暂存目录</b>（上方设置）：写入前先把上游文件复制到这里，补全标签、嵌入封面；入库后自动清空。会短暂占用与音频等量的空间，不是上游的下载目录。</div>
+                <div>• <b>最终音乐目录 /library</b>：整理完成后归档到 歌手/专辑 子目录，Navidrome 只扫描这里。</div>
+                <div class="dim">因此「整理暂存目录」并非无用：它是标签与封面处理的工作区，避免修改上游目录里的原文件。</div>
+              </div>
+            </el-alert>
             <el-form-item label="上游 API 地址">
               <el-input v-model="config.upstream.base_url" placeholder="https://music.gdstudio.xyz" />
             </el-form-item>
@@ -293,6 +327,9 @@ const testing = ref(false)
 const syncing = ref(false)
 const syncingPlaylists = ref(false)
 const testingUpstream = ref(false)
+const proxyTestUrl = ref('https://www.google.com/generate_204')
+const testingProxy = ref(false)
+const proxyResult = ref(null)
 
 function platformName(key) {
   return PLATFORM_META[key]?.name || key
@@ -387,6 +424,25 @@ async function testUpstream() {
     ElMessage.error(error.response?.data?.detail || '上游连接失败')
   } finally {
     testingUpstream.value = false
+  }
+}
+
+async function testProxy() {
+  testingProxy.value = true
+  proxyResult.value = null
+  try {
+    const { data } = await api.post('/settings/test-proxy', { url: proxyTestUrl.value })
+    proxyResult.value = {
+      ok: true,
+      text: `连接成功：HTTP ${data.status_code}，耗时 ${data.elapsed_ms} ms（代理 ${data.proxy}）`,
+    }
+    ElMessage.success('代理连接正常')
+  } catch (error) {
+    const detail = error.response?.data?.detail || error.message || '代理测试失败'
+    proxyResult.value = { ok: false, text: detail }
+    ElMessage.error(detail)
+  } finally {
+    testingProxy.value = false
   }
 }
 

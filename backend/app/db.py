@@ -215,10 +215,7 @@ async def load_runtime_config() -> RuntimeConfig:
     if row:
         try:
             cfg = RuntimeConfig.model_validate(json.loads(row["value"]))
-            if _needs_upstream_migration(cfg):
-                # 内置上游上线后，把从未改过的旧默认地址迁移到容器内上游
-                cfg.upstream.base_url = settings.upstream_base_url
-                cfg.upstream.local_download_dir = settings.upstream_local_download_dir
+            if _migrate_legacy_defaults(cfg):
                 await save_runtime_config(cfg)
             _runtime_config = cfg
             return cfg
@@ -229,12 +226,27 @@ async def load_runtime_config() -> RuntimeConfig:
     return _runtime_config
 
 
-def _needs_upstream_migration(cfg: RuntimeConfig) -> bool:
-    return bool(
+def _migrate_legacy_defaults(cfg: RuntimeConfig) -> bool:
+    """把旧版本的默认配置迁移到内置上游与新音乐库目录。"""
+    changed = False
+    if (
         settings.upstream_local_download_dir
         and cfg.upstream.base_url.rstrip("/") == "https://music.gdstudio.xyz"
         and not cfg.upstream.local_download_dir
-    )
+    ):
+        cfg.upstream.base_url = settings.upstream_base_url
+        cfg.upstream.local_download_dir = settings.upstream_local_download_dir
+        changed = True
+
+    # /music 是上游下载目录，旧版本若把音乐库或暂存目录指向这里，自动迁移
+    legacy_music = "/music"
+    for key in ("final_music_dir", "temp_download_dir"):
+        current = getattr(cfg.paths, key).rstrip("/")
+        default = getattr(settings, key).rstrip("/")
+        if current == legacy_music and default != legacy_music:
+            setattr(cfg.paths, key, getattr(settings, key))
+            changed = True
+    return changed
 
 
 def get_runtime_config() -> RuntimeConfig:

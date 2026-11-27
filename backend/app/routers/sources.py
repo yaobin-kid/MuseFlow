@@ -109,6 +109,8 @@ async def playlist_tracks(
             for s in track.get("sources", [])
         ]
         results.append(track)
+    # 默认按最终得分从高到低排序，同分时保持榜单原始名次
+    results.sort(key=lambda item: (-(item.get("score") or 0), item.get("playlist_rank") or 0))
     return {"playlist": playlist, "tracks": results}
 
 

@@ -1,7 +1,13 @@
 """系统设置与运维接口。"""
 from __future__ import annotations
 
+import re
+import time
+from urllib.parse import urlsplit
+
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from ..config import RuntimeConfig, build_default_runtime_config, settings
 from ..db import fetchone, get_runtime_config, get_setting, save_runtime_config
@@ -14,6 +20,21 @@ from ..services.rate_limiter import apply_rate_limit_config, limiter
 from ..services.upstream import UpstreamService
 
 router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(get_current_user)])
+
+DEFAULT_PROXY_TEST_URL = "https://www.google.com/generate_204"
+
+
+class ProxyTestPayload(BaseModel):
+    url: str = DEFAULT_PROXY_TEST_URL
+
+
+def _mask_proxy(proxy: str) -> str:
+    parsed = urlsplit(proxy)
+    if parsed.username or parsed.password:
+        host = parsed.hostname or ""
+        port = f":{parsed.port}" if parsed.port else ""
+        return f"{parsed.scheme}://***@{host}{port}"
+    return proxy
 
 
 @router.get("/runtime")
@@ -80,6 +101,50 @@ async def test_upstream() -> dict:
         return {"ok": True, "message": f"上游连接正常，返回 {len(items)} 条结果"}
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"上游连接失败: {exc}")
+
+
+@router.post("/test-proxy")
+async def test_proxy(payload: ProxyTestPayload | None = None) -> dict:
+    cfg = get_runtime_config()
+    proxy = (cfg.network.proxy_url or "").strip()
+    if not proxy:
+        raise HTTPException(status_code=400, detail="未配置代理地址，请填写代理并保存后再测试")
+
+    target = ((payload.url if payload else "") or DEFAULT_PROXY_TEST_URL).strip()
+    if not target:
+        target = DEFAULT_PROXY_TEST_URL
+    if len(target) > 2048:
+        raise HTTPException(status_code=400, detail="测试地址过长")
+    if not re.match(r"^https?://", target, re.IGNORECASE):
+        target = "https://" + target
+    parsed = urlsplit(target)
+    if not parsed.hostname:
+        raise HTTPException(status_code=400, detail="测试地址无效，请填写完整网址")
+
+    started = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(
+            proxy=proxy,
+            timeout=httpx.Timeout(20.0, connect=15.0),
+            follow_redirects=True,
+            headers={"User-Agent": "MuseFlow/1.0"},
+        ) as client:
+            resp = await client.get(target)
+        elapsed = int((time.perf_counter() - started) * 1000)
+    except Exception as exc:  # noqa: BLE001
+        await hub.log("WARN", "settings", f"代理测试失败：{target} → {exc}")
+        raise HTTPException(status_code=502, detail=f"代理测试失败：{exc}") from exc
+
+    await hub.log(
+        "INFO", "settings", f"代理测试成功：{target} → HTTP {resp.status_code}（{elapsed}ms）"
+    )
+    return {
+        "ok": True,
+        "url": target,
+        "proxy": _mask_proxy(proxy),
+        "status_code": resp.status_code,
+        "elapsed_ms": elapsed,
+    }
 
 
 @router.post("/test-navidrome")

@@ -127,7 +127,7 @@ class UpstreamService:
             await hub.log("WARN", "upstream", f"上游文件获取异常: {exc}")
             return None
 
-    async def lyric(self, item: dict, temp_dir: str) -> Optional[str]:
+    async def lyric(self, item: dict, temp_dir: str) -> tuple[Optional[str], str]:
         payload = {
             "source": item.get("source") or item.get("_searched_source") or "",
             "id": str(item.get("id") or ""),
@@ -146,10 +146,37 @@ class UpstreamService:
                         client, filename, temp_dir
                     )
                     if path:
-                        return path
+                        return path, filename
         except Exception as exc:  # noqa: BLE001
             await hub.log("WARN", "upstream", f"歌词下载失败: {exc}")
-        return None
+        return None, ""
+
+    async def remove_local(self, *filenames: str) -> int:
+        """入库成功后清理内置上游下载目录中的音频与歌词文件。"""
+        base = (self.cfg.local_download_dir or "").strip()
+        if not base:
+            return 0
+        candidates: set[str] = set()
+        for filename in filenames:
+            if not filename:
+                continue
+            name = os.path.basename(filename)
+            candidates.add(name)
+            stem, ext = os.path.splitext(name)
+            if ext.lower() in (".flac", ".mp3", ".m4a", ".aac", ".wav", ".ogg", ".ape"):
+                candidates.add(stem + ".lrc")
+        removed = 0
+        for name in candidates:
+            target = os.path.join(base, name)
+            try:
+                if os.path.isfile(target):
+                    os.remove(target)
+                    removed += 1
+            except OSError as exc:
+                await hub.log("WARN", "upstream", f"清理上游文件失败：{target}：{exc}")
+        if removed:
+            await hub.log("INFO", "upstream", f"已清理上游下载目录 {base} 中的 {removed} 个文件")
+        return removed
 
     # ---------------------------------------------------------------- 封面
     async def fetch_cover(self, item: dict) -> Optional[bytes]:

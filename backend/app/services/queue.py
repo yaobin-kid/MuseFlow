@@ -109,9 +109,10 @@ class DownloadWorker:
             await push_task(await get_task(task_id))
 
             lyric_path = None
+            lyric_name = ""
             try:
                 await limiter.acquire()
-                lyric_path = await upstream.lyric(item, temp_dir)
+                lyric_path, lyric_name = await upstream.lyric(item, temp_dir)
             except Exception:
                 lyric_path = None
 
@@ -145,6 +146,12 @@ class DownloadWorker:
             )
             if task.get("track_id"):
                 await set_track_status(task["track_id"], "COMPLETED", result["final_path"])
+
+            # 整理入库成功后，清理上游下载目录中的音频与歌词源文件
+            await upstream.remove_local(
+                (meta or {}).get("filename") if isinstance(meta, dict) else "",
+                lyric_name,
+            )
 
             key = f"{_norm(primary_artist(item.get('artist') or task['artist']))}::{_norm(item.get('name') or task['title'])}"
             navidrome.add_key(key, item.get("artist") or task["artist"], item.get("name") or task["title"], item.get("album") or "")

@@ -164,7 +164,7 @@ services:
 | --- | --- | --- | --- |
 | `/music` | `./music` | 上游服务专用 | 上游固定下载目录，MuseFlow **只读**读取，绝不写入 |
 | `/library` | `./library` | MuseFlow | 最终音乐库（按歌手/专辑归档），Navidrome 只扫描这里 |
-| `/data` | `./data` | MuseFlow | SQLite 数据库、日志、临时下载文件 |
+| `/data` | `./data` | MuseFlow | SQLite 数据库、日志、整理暂存文件 |
 
 | 配置项 | 说明 |
 | --- | --- |
@@ -271,7 +271,7 @@ COLLECT_INTERVAL_MINUTES=360
 
 > **内置上游说明**：镜像基于 `ghcr.io/juneix/nas-music-kit:latest`，容器启动时会先在内部 `8080` 启动上游服务（`/api/search`、`/api/download`、`/api/lyric`、`/api/cover`），再启动 MuseFlow。默认 `UPSTREAM_BASE_URL=http://127.0.0.1:8080`，无需额外部署上游容器；如需使用外部上游，设置 `RUN_UPSTREAM=false`、清空 `UPSTREAM_LOCAL_DOWNLOAD_DIR` 并修改 `UPSTREAM_BASE_URL`。
 >
-> **目录不要混用**：`/music` 是上游固定下载目录（不要修改，也不要让 Navidrome 扫描）；MuseFlow 会把整理后的文件复制到 `/library`，Navidrome 只扫描 `/library`。
+> **目录不要混用**：`/music` 是上游固定下载目录（不要修改，也不要让 Navidrome 扫描）；MuseFlow 会把整理后的文件复制到 `/library`，Navidrome 只扫描 `/library`。旧版本数据库中若音乐库仍指向 `/music`，启动时会自动迁移到 `/library`。
 >
 > `NAVIDROME_URL` 使用容器名，两个服务需在同一 Docker 网络（同一 compose 文件默认满足）；Navidrome 部署在别处时改成实际地址。
 
@@ -366,7 +366,7 @@ COLLECT_INTERVAL_MINUTES=360
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `TEMP_DOWNLOAD_DIR` | `/data/downloads/temp`（镜像内） | 临时下载目录 |
+| `TEMP_DOWNLOAD_DIR` | `/data/downloads/temp`（镜像内） | 整理暂存目录：上游文件复制到此补标签/封面，入库后清空（不是上游下载目录） |
 | `FINAL_MUSIC_DIR` | `/library`（镜像内） | MuseFlow 最终音乐库，Navidrome 只扫描该目录 |
 
 ### Webhook 通知
@@ -454,7 +454,7 @@ MuseFlow 内置 `/api/cover` 代理封面接口，供浏览器 `<img>` 直接引
 ```text
 data/
 ├─ museflow.db              # SQLite：配置、榜单、曲目、任务、日志、索引缓存
-└─ downloads/temp/          # 临时下载文件
+└─ downloads/temp/          # 整理暂存（补标签/封面，入库后清空）
 library/                   # 最终音乐库（按 歌手/专辑/歌曲 归档，Navidrome 扫描此目录）
 music/                     # 上游服务的下载目录（只读，MuseFlow 不写入）
 backend/app/static/        # 前端构建产物（由 FastAPI 托管）

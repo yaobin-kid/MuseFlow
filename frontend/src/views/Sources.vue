@@ -93,7 +93,10 @@
             size="small"
             row-key="id"
             :expand-row-keys="expanded"
+            :default-sort="{ prop: 'score', order: 'descending' }"
+            :row-style="rowStyle"
             @expand-change="onExpandChange"
+            @row-click="onRowClick"
           >
             <el-table-column type="expand">
               <template #default="{ row }">
@@ -114,12 +117,12 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="最终得分" width="104">
+            <el-table-column label="最终得分" width="104" prop="score" sortable>
               <template #default="{ row }">
                 <span class="score-badge" :style="scoreStyle(row)">{{ row.final_score ?? row.score }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="状态" width="108">
+            <el-table-column label="状态" width="108" prop="status" sortable :sort-method="sortByStatus">
               <template #default="{ row }">
                 <StatusTag :status="row.status" />
               </template>
@@ -195,6 +198,40 @@ const expanded = ref([])
 
 function onExpandChange(row, rows) {
   expanded.value = (rows || []).map((item) => item.id)
+}
+
+function rowStyle() {
+  return { cursor: 'pointer' }
+}
+
+function onRowClick(row, column, event) {
+  // 点击展开箭头时交给表格自身处理，避免重复切换
+  if (event?.target?.closest?.('.el-table__expand-icon')) return
+  const id = row.id
+  expanded.value = expanded.value.includes(id)
+    ? expanded.value.filter((key) => key !== id)
+    : [...expanded.value, id]
+}
+
+const STATUS_SORT_ORDER = [
+  'QUEUED_DOWNLOAD',
+  'WAITING',
+  'DOWNLOADING',
+  'PROCESSING',
+  'COMPLETED',
+  'SKIPPED_EXISTS',
+  'FILTERED_LOW_SCORE',
+  'FAILED',
+  'CANCELLED',
+  'PENDING'
+]
+
+function sortByStatus(a, b) {
+  const indexOf = (row) => {
+    const index = STATUS_SORT_ORDER.indexOf(row.status)
+    return index < 0 ? STATUS_SORT_ORDER.length : index
+  }
+  return indexOf(a) - indexOf(b)
 }
 
 function platformName(key) {

@@ -1,0 +1,23 @@
+services:
+  museflow:
+    build:
+      context: .
+      args:
+        NPM_REGISTRY: https://registry.npmmirror.com
+        PIP_INDEX_URL: https://pypi.tuna.tsinghua.edu.cn/simple
+    image: museflow:latest
+    container_name: museflow
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      DATA_DIR: /data
+      TEMP_DOWNLOAD_DIR: /data/downloads/temp
+      FINAL_MUSIC_DIR: /music
+    volumes:
+      - ./data:/data
+      # 将左侧修改为 NAS 上的实际音乐目录
+      - ./music:/music

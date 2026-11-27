@@ -6,6 +6,24 @@ MusicFlow 是一套自托管的音乐自动化控制台：从网易云音乐、Q
 
 ***
 
+## 界面预览
+
+<p align="center">
+  <img src="static/登录.png" alt="登录" width="820" />
+  <br />
+  <sub>登录</sub>
+</p>
+
+| 数据看板 | 数据源与打分预览 |
+| :---: | :---: |
+| <img src="static/数据看板.png" alt="数据看板" width="520" /> | <img src="static/数据源与打分预览.png" alt="数据源与打分预览" width="520" /> |
+
+| 动态规则配置 | 设置 |
+| :---: | :---: |
+| <img src="static/动态规则配置.png" alt="动态规则配置" width="520" /> | <img src="static/设置.png" alt="设置" width="520" /> |
+
+***
+
 ## 功能特性
 
 - **账号登录**：JWT 鉴权，全部控制台接口需登录访问

@@ -17,7 +17,6 @@ from ..security import get_current_user
 from ..services.navidrome import navidrome
 from ..services.queue import worker
 from ..services.rate_limiter import apply_rate_limit_config, limiter
-from ..services.upstream import UpstreamService
 
 router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(get_current_user)])
 
@@ -110,12 +109,36 @@ async def system_info() -> dict:
 @router.post("/test-upstream")
 async def test_upstream() -> dict:
     cfg = get_runtime_config()
-    service = UpstreamService(cfg.upstream)
+    base = cfg.upstream.base_url.rstrip("/")
+    if not base:
+        raise HTTPException(status_code=400, detail="未配置上游服务地址")
+    target = base + "/"
+    started = time.perf_counter()
     try:
-        items = await service.search(cfg.upstream.source_order[0] if cfg.upstream.source_order else "netease", "周杰伦")
-        return {"ok": True, "message": f"上游连接正常，返回 {len(items)} 条结果"}
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0, connect=8.0),
+            follow_redirects=True,
+            headers={"User-Agent": "MusicFlow/1.0"},
+        ) as client:
+            resp = await client.get(target)
+        elapsed = int((time.perf_counter() - started) * 1000)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"上游连接失败: {exc}")
+        reason = str(exc).strip() or repr(exc)
+        await hub.log("WARN", "settings", f"上游连通性测试失败：{target} → {reason}")
+        raise HTTPException(status_code=502, detail=f"上游连接失败: {reason}") from exc
+
+    if resp.status_code >= 400:
+        await hub.log("WARN", "settings", f"上游连通性测试异常：{target} → HTTP {resp.status_code}")
+        raise HTTPException(status_code=502, detail=f"上游返回 HTTP {resp.status_code}，请检查服务是否正常")
+
+    await hub.log("INFO", "settings", f"上游连通性测试成功：{target} → HTTP {resp.status_code}（{elapsed}ms）")
+    return {
+        "ok": True,
+        "url": target,
+        "status_code": resp.status_code,
+        "elapsed_ms": elapsed,
+        "message": f"上游连接正常（HTTP {resp.status_code}，{elapsed}ms）",
+    }
 
 
 @router.post("/test-proxy")
